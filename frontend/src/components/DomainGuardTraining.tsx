@@ -294,10 +294,11 @@ export function DomainGuardTraining({
               </div>
               <div className="aspect-video w-full rounded-xl overflow-hidden">
                 <iframe
+                  key={selectedVideo}
                   className="w-full h-full"
-                  src={`https://www.youtube-nocookie.com/embed/${selectedVideo}?rel=0`}
+                  src={`https://www.youtube.com/embed/${selectedVideo}?rel=0&autoplay=1`}
                   title="CAT Training Video"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                   allowFullScreen
                 />
               </div>
