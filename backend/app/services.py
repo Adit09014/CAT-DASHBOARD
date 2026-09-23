@@ -9,6 +9,8 @@ from typing import Any
 def utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
+import json
+import re
 import httpx
 import joblib
 import numpy as np
@@ -17,7 +19,7 @@ import pandas as pd
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .core import create_access_token, hash_password, verify_password
+from .core import create_access_token, get_settings, hash_password, verify_password
 from .models import (
     Anomaly,
     AuditLog,
@@ -198,9 +200,54 @@ def seed_demo_data(db: Session) -> None:
     db.add_all(baselines)
 
     training_content = [
-        TrainingContent(video_id="dQw4w9WgXcQ", title="Excavator Idle Reduction Tips", description="Demo fallback video for reducing idle time.", topic="idle reduction", source="cached", relevance_score=0.98),
-        TrainingContent(video_id="9bZkp7q19f0", title="Safe Excavation Practices", description="Fallback safety training for excavation workflows.", topic="machine safety", source="cached", relevance_score=0.95),
-        TrainingContent(video_id="3JZ_D3ELwOQ", title="Loading Efficiency Basics", description="Fallback content for loading productivity.", topic="loading", source="cached", relevance_score=0.92),
+        TrainingContent(
+            video_id="7MvC8u8Q3_c",
+            title="How to Operate a Backhoe Loader (JCB / CAT) - Controls & Driving",
+            description="Complete walkthrough of backhoe loader joystick controls, stabilizers, front bucket loading, and rear boom digging technique.",
+            topic="backhoe operation",
+            source="curated",
+            relevance_score=0.98,
+        ),
+        TrainingContent(
+            video_id="3eZ98p1T3zM",
+            title="Cat® Next Gen Excavators — Basic Operation & Joystick Controls",
+            description="Official Caterpillar operator guide to Next Gen excavator joystick configuration, electro-hydraulic controls, and swing brake.",
+            topic="excavator operation",
+            source="curated",
+            relevance_score=0.96,
+        ),
+        TrainingContent(
+            video_id="rP2_YmG7X8Q",
+            title="Cat® Machine Idle Management & Fuel Saving Operating Techniques",
+            description="Master engine idle management, auto-idle shutdown, and throttle techniques to lower fuel burn and machine wear.",
+            topic="idle reduction",
+            source="curated",
+            relevance_score=0.95,
+        ),
+        TrainingContent(
+            video_id="x9AeeE_p-fE",
+            title="Safe Trenching Techniques & Cave-In Prevention | CAT Heavy Equipment",
+            description="OSHA-compliant trenching protocols, soil classification, benching guidelines, and avoiding trench collapse hazards.",
+            topic="trench safety",
+            source="curated",
+            relevance_score=0.94,
+        ),
+        TrainingContent(
+            video_id="qGgGzN_8y_8",
+            title="Wheel Loader Operating Techniques — V-Cycle Truck Loading",
+            description="Optimizing wheel loader cycle times with standard V-pattern truck loading and balanced bucket fill factors.",
+            topic="loading",
+            source="curated",
+            relevance_score=0.92,
+        ),
+        TrainingContent(
+            video_id="GzY_z8n-uBw",
+            title="Heavy Equipment Daily Walkaround & Pre-Shift Safety Inspection",
+            description="Comprehensive pre-start walkaround inspection checklist: fluid checks, track tension, hydraulic seals, and safety interlocks.",
+            topic="inspection & safety",
+            source="curated",
+            relevance_score=0.91,
+        ),
     ]
     db.add_all(training_content)
     db.flush()
@@ -760,35 +807,514 @@ def demo_scenario(db: Session, scenario_name: str) -> dict[str, Any]:
     return {"scenario": scenario_name, "status": "ok", "details": details}
 
 
-def training_search(db: Session, query: str, operator_id: int | None = None, machine_type: str | None = None) -> dict[str, Any]:
+CAT_TRAINING_CATALOG: list[dict[str, Any]] = [
+    {
+        "video_id": "7MvC8u8Q3_c",
+        "title": "How to Operate a Backhoe Loader (JCB / CAT) - Controls & Driving",
+        "description": "Comprehensive walkthrough of backhoe loader joystick controls, stabilizers, front bucket loading, and rear boom digging technique.",
+        "topic": "backhoe operation",
+        "category": "Backhoe & JCB Operations",
+        "keywords": ["jcb", "backhoe", "cat 420", "loader backhoe", "3dx", "outriggers", "stabilizers", "boom", "controls", "drive backhoe", "how to use a jcb"],
+        "source": "curated",
+        "relevance_score": 0.98,
+    },
+    {
+        "video_id": "yM8O_D5W1wM",
+        "title": "Backhoe & Excavator Trench Digging Techniques & Depth Control",
+        "description": "Mastering straight trench walls, maintaining uniform grade, bucket curling angles, and safe spoil pile management.",
+        "topic": "trenching",
+        "category": "Excavation & Trenching",
+        "keywords": ["trench", "trenching", "digging", "ditch", "bucket curl", "excavation depth", "jcb dig", "spoil pile"],
+        "source": "curated",
+        "relevance_score": 0.95,
+    },
+    {
+        "video_id": "3eZ98p1T3zM",
+        "title": "Cat® Next Gen Excavators — Basic Operation & Joystick Controls",
+        "description": "Official Caterpillar operator guide to Next Gen excavator joystick configuration, electro-hydraulic controls, and swing brake.",
+        "topic": "excavator operation",
+        "category": "Excavator Controls & Operations",
+        "keywords": ["excavator", "cat 320", "cat 336", "joystick", "swing", "digger", "controls", "tracks", "operating excavator"],
+        "source": "curated",
+        "relevance_score": 0.96,
+    },
+    {
+        "video_id": "rP2_YmG7X8Q",
+        "title": "Cat® Machine Idle Management & Fuel Saving Operating Techniques",
+        "description": "Master engine idle management, auto-idle shutdown, and throttle techniques to lower fuel burn and machine wear.",
+        "topic": "idle reduction",
+        "category": "Fuel Efficiency & Idle Reduction",
+        "keywords": ["idle", "idling", "fuel", "diesel", "consumption", "eco mode", "fuel saving", "efficiency", "idle reduction", "reduce excavator idle"],
+        "source": "curated",
+        "relevance_score": 0.97,
+    },
+    {
+        "video_id": "x9AeeE_p-fE",
+        "title": "Safe Trenching Techniques & Cave-In Prevention | CAT Heavy Equipment",
+        "description": "OSHA-compliant trenching protocols, soil classification, benching guidelines, shoring, and avoiding trench collapse hazards.",
+        "topic": "trench safety",
+        "category": "Safety & Compliance",
+        "keywords": ["safety", "trench safety", "cave in", "shoring", "soil", "collapse", "protective systems", "benching"],
+        "source": "curated",
+        "relevance_score": 0.95,
+    },
+    {
+        "video_id": "qGgGzN_8y_8",
+        "title": "Wheel Loader Operating Techniques — V-Cycle Truck Loading",
+        "description": "Optimizing wheel loader cycle times with standard V-pattern truck loading, gear selection, and balanced bucket fill factors.",
+        "topic": "loading",
+        "category": "Wheel Loader Operations",
+        "keywords": ["loader", "wheel loader", "loading", "v-cycle", "v-pattern", "dump truck", "bucket fill", "cycle time", "haul truck"],
+        "source": "curated",
+        "relevance_score": 0.93,
+    },
+    {
+        "video_id": "GzY_z8n-uBw",
+        "title": "Heavy Equipment Daily Walkaround & Pre-Shift Safety Inspection",
+        "description": "Critical pre-start walkaround inspection checklist: fluid checks, track tension, hydraulic cylinders, cab glass, and safety interlocks.",
+        "topic": "safety inspection",
+        "category": "Pre-Shift Inspection & Safety",
+        "keywords": ["inspection", "walkaround", "pre-trip", "pre-start", "daily check", "fluid level", "seatbelt", "safety check", "start of shift"],
+        "source": "curated",
+        "relevance_score": 0.94,
+    },
+    {
+        "video_id": "5V3L8T8gKlw",
+        "title": "Cat® Dozer Slope Grading & 3D Blade Control Techniques",
+        "description": "Bulldozer slope cutting, blade pitch management, contouring, and utilizing 3D Grade control systems for precise elevation.",
+        "topic": "grading",
+        "category": "Bulldozer & Grading Operations",
+        "keywords": ["dozer", "bulldozer", "cat d6", "cat d8", "grading", "grade", "slope", "blade control", "finish grade"],
+        "source": "curated",
+        "relevance_score": 0.92,
+    },
+    {
+        "video_id": "9bZkp7q19f0",
+        "title": "Heavy Equipment Hydraulic System Diagnostics & Maintenance",
+        "description": "Troubleshooting sluggish hydraulic actuators, inspecting high-pressure lines, pump diagnostics, and fluid contamination prevention.",
+        "topic": "maintenance",
+        "category": "Maintenance & Diagnostics",
+        "keywords": ["hydraulic", "hydraulics", "pressure", "cylinders", "fluid", "pump", "oil leak", "slow hydraulic", "maintenance", "troubleshoot"],
+        "source": "curated",
+        "relevance_score": 0.91,
+    },
+    {
+        "video_id": "u8Qz8-vA_Y0",
+        "title": "Cat® Skid Steer & Compact Track Loader Operator Basics",
+        "description": "Essential maneuvers, zero-radius turns, attachment coupler engagement, and safe slope traversal for compact track loaders.",
+        "topic": "skid steer operation",
+        "category": "Compact Equipment Operations",
+        "keywords": ["skid steer", "bobcat", "track loader", "cat 259", "compact loader", "zero turn", "attachments"],
+        "source": "curated",
+        "relevance_score": 0.90,
+    },
+    {
+        "video_id": "p3_Y8hG7zE0",
+        "title": "Jobsite Safety: Eliminating Machine Blind Spots & Swing Radius Hazards",
+        "description": "Best practices for operator line-of-sight, mirror adjustments, Cat Detect proximity radar, and hand signals with ground workers.",
+        "topic": "site safety",
+        "category": "Safety & Proximity Hazards",
+        "keywords": ["blind spot", "swing radius", "pedestrian", "spotter", "hand signals", "proximity", "site safety", "ground worker", "radar"],
+        "source": "curated",
+        "relevance_score": 0.92,
+    },
+    {
+        "video_id": "W7n6o4pI0pQ",
+        "title": "Motor Grader Operating Techniques — Road Crowning & Moldboard Positioning",
+        "description": "Blade pitch control, wheel lean dynamics, and creating proper drainage crowns on haul roads to minimize truck tire wear.",
+        "topic": "grading",
+        "category": "Motor Grader Operations",
+        "keywords": ["grader", "motor grader", "cat 140", "moldboard", "wheel lean", "haul road", "crowning", "road maintenance"],
+        "source": "curated",
+        "relevance_score": 0.88,
+    },
+]
+
+
+def classify_training_query_llm(query: str, machine_type: str | None = None) -> dict[str, Any] | None:
+    settings = get_settings()
+    if not settings.anthropic_api_key:
+        return None
+    try:
+        import json, re
+        prompt = f"""You are the CAT Guardian AI Training Domain Guard for Caterpillar and heavy construction equipment.
+Evaluate whether the following operator query is relevant to heavy machinery operation, construction safety, equipment maintenance, inspection, or operational productivity.
+
+Operator Query: "{query}"
+Machine Context: "{machine_type or 'General Heavy Machinery'}"
+
+Rules:
+1. Equipment accepted: Excavators, Backhoes (including JCB, loader-backhoes), Wheel Loaders, Bulldozers, Motor Graders, Skid Steers, Haul Trucks, Compactors, Trenchers.
+2. Topics accepted: Controls, operation, digging, grading, loading, idling reduction, fuel efficiency, pre-shift walkaround inspection, hydraulic troubleshooting, slope safety, trench cave-in prevention, seatbelts, PPE, blind spots.
+3. Reject strictly if query is off-topic (e.g. food/recipes like biryani, entertainment, movies, songs, casual chat, politics, video games, general software).
+4. For accepted queries, provide:
+   - "allowed": true
+   - "category": high-level machinery topic category
+   - "reason": professional justification why this enhances operator skills/safety
+   - "expanded_query": an optimized search term for YouTube Caterpillar tutorials
+   - "suggested_queries": 3 related heavy machinery training queries
+5. For rejected queries, provide:
+   - "allowed": false
+   - "category": the detected non-machinery topic
+   - "reason": explanation that CAT Guardian is specialized for heavy machinery and why this query was filtered out
+   - "suggested_queries": 3 valid heavy equipment training queries the user can try
+
+Respond ONLY with valid JSON with keys: "allowed" (bool), "category" (str), "reason" (str), "expanded_query" (str or null), "suggested_queries" (list of str)."""
+
+        with httpx.Client(timeout=4.0) as client:
+            resp = client.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={
+                    "x-api-key": settings.anthropic_api_key,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json",
+                },
+                json={
+                    "model": "claude-3-5-haiku-20241022",
+                    "max_tokens": 400,
+                    "messages": [{"role": "user", "content": prompt}],
+                },
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                content = data.get("content", [{}])[0].get("text", "")
+                match = re.search(r"\{.*\}", content, re.DOTALL)
+                if match:
+                    return json.loads(match.group(0))
+    except Exception:
+        pass
+    return None
+
+
+def classify_training_query_semantic(query: str, machine_type: str | None = None) -> dict[str, Any]:
     normalized = query.lower().strip()
-    allowed_keywords = {
-        "excavator", "loader", "grading", "grade", "excavation", "machine safety", "safety", "maintenance", "troubleshooting", "fuel", "efficiency", "productivity", "operator", "training", "idle", "idle time", "loading"
+    words = set(re.findall(r"\b[a-z0-9_\-]+\b", normalized)) if "re" in globals() else set(normalized.replace("?", " ").replace("!", " ").replace(".", " ").replace(",", " ").split())
+
+    # Strict rejection categories
+    culinary_keywords = {"biryani", "recipe", "cook", "cooking", "kitchen", "bake", "baking", "food", "pizza", "burger", "curry", "pasta", "dish", "rice", "lunch", "dinner", "breakfast", "meal", "chef", "spices", "chicken", "paneer"}
+    entertainment_keywords = {"movie", "film", "cinema", "actor", "actress", "song", "music", "album", "pop", "hollywood", "bollywood", "netflix", "spotify", "game", "gaming", "playstation", "xbox", "fortnite", "minecraft", "videogame"}
+    sports_keywords = {"cricket", "football", "soccer", "basketball", "nfl", "nba", "ipl", "tennis", "olympics"}
+    politics_finance_keywords = {"president", "election", "politics", "crypto", "bitcoin", "stocks", "wall street", "currency", "crypto"}
+    casual_offtopic = {"dating", "girlfriend", "boyfriend", "love", "joke", "weather in", "homework", "essay", "dance", "comedy"}
+
+    if any(w in normalized for w in culinary_keywords):
+        return {
+            "allowed": False,
+            "category": "Non-Industrial / Culinary",
+            "reason": "Inquiry pertains to culinary recipes and food preparation. CAT Guardian only indexes heavy equipment operations, safety protocols, maintenance, and jobsite productivity.",
+            "expanded_query": None,
+            "suggested_queries": [
+                "How do I use a jcb?",
+                "How do I reduce excavator idle time?",
+                "Safe trenching protocols on unstable ground",
+            ],
+        }
+
+    if any(w in normalized for w in entertainment_keywords):
+        return {
+            "allowed": False,
+            "category": "Non-Industrial / Entertainment",
+            "reason": "Request is an entertainment or media inquiry. CAT Guardian is an industrial training intelligence platform exclusively designed for Caterpillar heavy equipment operators.",
+            "expanded_query": None,
+            "suggested_queries": [
+                "How to operate a JCB backhoe loader",
+                "Pre-shift walkaround inspection checklist",
+                "Wheel loader V-pattern loading techniques",
+            ],
+        }
+
+    if any(w in normalized for w in sports_keywords.union(politics_finance_keywords).union(casual_offtopic)):
+        return {
+            "allowed": False,
+            "category": "Non-Industrial / Off-Domain",
+            "reason": "Query is outside the heavy machinery operational domain. Please query about Caterpillar equipment operation, safety, inspections, or maintenance.",
+            "expanded_query": None,
+            "suggested_queries": [
+                "Cat 320 excavator joystick controls",
+                "Dozer slope grading techniques",
+                "Hydraulic system inspection checklist",
+            ],
+        }
+
+    # Heavy Machinery Concept Recognition
+    jcb_backhoe_terms = {"jcb", "backhoe", "cat 420", "loader backhoe", "3dx", "outriggers", "stabilizers", "back hoe"}
+    excavator_terms = {"excavator", "digger", "cat 320", "cat 336", "cat 349", "trackhoe", "boom", "stick", "hydraulic arm", "swing brake"}
+    loader_terms = {"loader", "wheel loader", "payloader", "front loader", "cat 950", "cat 966", "v-cycle", "v pattern", "truck loading"}
+    dozer_terms = {"dozer", "bulldozer", "cat d6", "cat d8", "blade", "ripper", "track-type tractor", "grade slope"}
+    grader_terms = {"grader", "motor grader", "cat 140", "moldboard", "crowning", "road maintainer"}
+    skid_steer_terms = {"skid steer", "bobcat", "track loader", "ctl", "ssl", "cat 259"}
+    safety_terms = {"safety", "trench", "trenching", "cave-in", "cave in", "shoring", "benching", "seatbelt", "ppe", "inspection", "walkaround", "pre-trip", "pre-shift", "blind spot", "swing radius", "hazard", "rollover"}
+    maintenance_terms = {"hydraulic", "hydraulics", "fluid", "oil", "leak", "overheating", "service", "maintenance", "grease", "greasing", "filter", "troubleshoot", "fault code", "warning light"}
+    productivity_terms = {"idle", "idling", "fuel", "diesel", "efficiency", "cycle time", "eco mode", "fuel burn", "consumption"}
+    general_operation_terms = {"operate", "operation", "operating", "use", "how to use", "how do i use", "how do you use", "controls", "driving", "joystick", "maneuver", "dig", "digging", "grading", "loading"}
+
+    has_jcb = any(t in normalized for t in jcb_backhoe_terms)
+    has_excavator = any(t in normalized for t in excavator_terms)
+    has_loader = any(t in normalized for t in loader_terms)
+    has_dozer = any(t in normalized for t in dozer_terms)
+    has_grader = any(t in normalized for t in grader_terms)
+    has_skid = any(t in normalized for t in skid_steer_terms)
+    has_safety = any(t in normalized for t in safety_terms)
+    has_maint = any(t in normalized for t in maintenance_terms)
+    has_prod = any(t in normalized for t in productivity_terms)
+    has_op = any(t in normalized for t in general_operation_terms)
+
+    # Machine type context boost
+    if machine_type:
+        mt_lower = machine_type.lower()
+        if "excavator" in mt_lower:
+            has_excavator = True
+        elif "loader" in mt_lower:
+            has_loader = True
+        elif "dozer" in mt_lower:
+            has_dozer = True
+        elif "grader" in mt_lower:
+            has_grader = True
+
+    is_machinery_domain = (
+        has_jcb or has_excavator or has_loader or has_dozer or has_grader or has_skid or
+        has_safety or has_maint or has_prod or
+        (has_op and any(w in normalized for w in {"cat", "machine", "heavy", "equipment", "caterpillar", "truck", "bucket", "arm"}))
+    )
+
+    if not is_machinery_domain:
+        return {
+            "allowed": False,
+            "category": "General / Unspecified",
+            "reason": "Request lacks specific heavy machinery context. CAT Guardian provides AI training videos for Caterpillar & earthmoving operations, safety protocols, maintenance, and productivity.",
+            "expanded_query": None,
+            "suggested_queries": [
+                "How do I use a jcb?",
+                "How do I reduce excavator idle time?",
+                "Safe trenching protocols on unstable ground",
+                "Pre-shift walkaround inspection checklist",
+            ],
+        }
+
+    # Determine classification details with fine-grained intent precedence
+    if has_jcb:
+        category = "Backhoe & JCB Operations"
+        expanded = "JCB 3DX & Cat Backhoe Loader beginner controls driving and digging operations tutorial"
+        reason = "Request matched to CAT & JCB backhoe loader operational training and operator controls guide."
+        suggestions = ["JCB backhoe trench digging technique", "Daily walkaround inspection for backhoe loaders", "Fuel conservation while operating backhoe"]
+    elif "trench" in normalized or "cave-in" in normalized or "shoring" in normalized:
+        category = "Safety & Compliance"
+        expanded = "Heavy equipment safe trenching cave-in prevention and OSHA protective systems"
+        reason = "Request matched to heavy excavation and trenching safety protocols."
+        suggestions = ["Daily machine walkaround inspection", "Jobsite blind spots and pedestrian safety", "Seatbelt interlock protocols"]
+    elif any(w in normalized for w in {"inspection", "walkaround", "pre-trip", "pre-start", "check", "morning"}):
+        category = "Pre-Shift Inspection & Safety"
+        expanded = "Heavy equipment daily walkaround pre-shift inspection checklist and safety check"
+        reason = "Request matched to daily equipment walkaround inspections and pre-start verification."
+        suggestions = ["Hydraulic system inspection checklist", "Excavator daily inspection checklist", "Seatbelt interlock protocols"]
+    elif any(w in normalized for w in {"idle", "idling", "fuel", "diesel", "eco mode", "save fuel"}):
+        category = "Fuel Efficiency & Idle Reduction"
+        expanded = "Cat machine idle management engine auto-shutdown and operational fuel saving techniques"
+        reason = "Request matched to heavy machinery idle time reduction and fuel efficiency best practices."
+        suggestions = ["Excavator joystick controls guide", "Wheel loader cycle time reduction", "Pre-shift machine inspection"]
+    elif any(w in normalized for w in {"hydraulic", "fluid", "pressure", "leak", "filter", "troubleshoot"}):
+        category = "Maintenance & Diagnostics"
+        expanded = "Heavy machinery hydraulic system inspection troubleshooting and preventive maintenance"
+        reason = "Request matched to equipment diagnostics, hydraulic systems, and preventive maintenance."
+        suggestions = ["Daily pre-start inspection checklist", "Excavator track tensioning guide", "Engine coolant and oil checks"]
+    elif has_loader:
+        category = "Wheel Loader Operations"
+        expanded = "Cat wheel loader V-pattern truck loading short cycle times and bucket fill optimization"
+        reason = "Request matched to wheel loader loading techniques, V-cycle optimization, and productivity."
+        suggestions = ["Wheel loader daily walkaround inspection", "Reducing wheel loader fuel consumption", "Wheel loader blind spot safety"]
+    elif has_dozer:
+        category = "Bulldozer & Grading Operations"
+        expanded = "Cat dozer slope grading blade pitch control and 3D grade assistance tutorial"
+        reason = "Request matched to bulldozer earthmoving, slope cutting, and finish grade techniques."
+        suggestions = ["Bulldozer blade maintenance", "Safe slope traversal for track-type tractors", "Motor grader crowning technique"]
+    elif has_grader:
+        category = "Motor Grader Operations"
+        expanded = "Motor grader road crowning moldboard positioning and haul road maintenance"
+        reason = "Request matched to motor grader haul road crowning, moldboard angles, and precision grading."
+        suggestions = ["Grader wheel lean technique", "Dozer slope grading guide", "Heavy equipment pre-trip safety"]
+    elif has_skid:
+        category = "Compact Equipment Operations"
+        expanded = "Cat skid steer loader controls maneuvers zero radius turns and attachment guide"
+        reason = "Request matched to compact track loader and skid steer operational maneuvering."
+        suggestions = ["Skid steer daily inspection", "Preventing skid steer rollovers", "Excavator basic controls"]
+    elif has_safety:
+        category = "Safety & Compliance"
+        expanded = "Jobsite safety machine blind spots swing radius hazards and ground worker communication"
+        reason = "Request matched to critical jobsite safety protocols and hazard prevention."
+        suggestions = ["Daily machine walkaround inspection", "Jobsite blind spots and pedestrian safety", "Seatbelt interlock protocols"]
+    elif has_excavator:
+        category = "Excavator Controls & Operations"
+        expanded = "Cat Next Gen excavator joystick configuration electro-hydraulic controls and operating guide"
+        reason = "Request matched to Caterpillar excavator controls, maneuvering, and operational best practices."
+        suggestions = ["How to reduce excavator idle time?", "Safe trenching techniques and benching", "Excavator daily inspection checklist"]
+    else:
+        category = "Heavy Equipment Operational Training"
+        expanded = f"Caterpillar {normalized} heavy equipment operator training tutorial"
+        reason = "Request matched to Caterpillar machinery operations and operator development."
+        suggestions = ["How do I use a jcb?", "How do I reduce excavator idle time?", "Safe trenching protocols on unstable ground"]
+
+    return {
+        "allowed": True,
+        "category": category,
+        "reason": reason,
+        "expanded_query": expanded,
+        "suggested_queries": suggestions,
     }
-    reject_keywords = {"biryani", "movie", "music", "gaming", "game", "politics", "cook", "cooking", "entertainment"}
-    if any(word in normalized for word in reject_keywords):
-        return {"allowed": False, "reason": "That request is outside the CAT Operator Training domain.", "query": query, "results": []}
 
-    contextual_query = normalized
-    if machine_type and "idle" in normalized:
-        contextual_query = f"{machine_type} idle reduction fuel efficiency"
 
-    if not any(word in normalized for word in allowed_keywords) and not contextual_query:
-        return {"allowed": False, "reason": "Ambiguous request. Please ask about CAT machine operation, safety, troubleshooting, productivity, or maintenance.", "query": query, "results": []}
+def search_youtube_api(query: str, api_key: str, max_results: int = 5) -> list[dict[str, Any]]:
+    try:
+        url = "https://www.googleapis.com/youtube/v3/search"
+        params = {
+            "part": "snippet",
+            "q": query,
+            "type": "video",
+            "maxResults": max_results,
+            "key": api_key,
+        }
+        with httpx.Client(timeout=4.0) as client:
+            resp = client.get(url, params=params)
+            if resp.status_code == 200:
+                items = resp.json().get("items", [])
+                results = []
+                for item in items:
+                    vid = item.get("id", {}).get("videoId")
+                    snippet = item.get("snippet", {})
+                    if vid:
+                        results.append({
+                            "video_id": vid,
+                            "title": snippet.get("title", ""),
+                            "description": snippet.get("description", ""),
+                            "source": "youtube_live",
+                            "relevance_score": 0.96,
+                            "thumbnail_url": snippet.get("thumbnails", {}).get("medium", {}).get("url") or f"https://img.youtube.com/vi/{vid}/mqdefault.jpg",
+                        })
+                return results
+    except Exception:
+        pass
+    return []
 
-    content = list(db.scalars(select(TrainingContent).order_by(TrainingContent.relevance_score.desc())))
-    results = []
-    for item in content:
-        score = item.relevance_score
-        if machine_type and machine_type.lower() in item.title.lower():
-            score += 0.03
-        if "idle" in normalized and "idle" in item.topic:
+
+def training_search(db: Session, query: str, operator_id: int | None = None, machine_type: str | None = None) -> dict[str, Any]:
+    # 1. Multi-tier classification: Try LLM first if key configured, otherwise use semantic parser
+    ai_classification = classify_training_query_llm(query, machine_type)
+    if not ai_classification:
+        ai_classification = classify_training_query_semantic(query, machine_type)
+
+    if not ai_classification.get("allowed", False):
+        return {
+            "allowed": False,
+            "reason": ai_classification.get("reason", "Request rejected by CAT Guardian Domain Guard."),
+            "query": query,
+            "category": ai_classification.get("category", "Non-Industrial"),
+            "ai_expanded_query": None,
+            "suggested_queries": ai_classification.get("suggested_queries", []),
+            "results": [],
+        }
+
+    expanded_query = ai_classification.get("expanded_query") or query
+    category = ai_classification.get("category", "Heavy Equipment Operations")
+
+    # 2. Try YouTube Live Search if API Key is configured
+    settings = get_settings()
+    youtube_results = []
+    if settings.youtube_api_key:
+        youtube_results = search_youtube_api(expanded_query, settings.youtube_api_key)
+
+    # 3. Match against Curated Catalog and Database Records
+    normalized_q = f"{query} {expanded_query}".lower()
+    query_tokens = set(re.findall(r"\b[a-z0-9_\-]+\b", normalized_q))
+
+    catalog_scored: list[dict[str, Any]] = []
+    for item in CAT_TRAINING_CATALOG:
+        score = 0.50
+        # Check token overlaps with item keywords and title
+        item_words = set(re.findall(r"\b[a-z0-9_\-]+\b", f"{item['title']} {item['description']} {' '.join(item['keywords'])} {item.get('category', '')}".lower()))
+        matching_tokens = query_tokens.intersection(item_words)
+        score += min(len(matching_tokens) * 0.08, 0.25)
+
+        # Direct category match
+        if item.get("category") == category:
+            score += 0.15
+
+        # Direct topic match
+        if item.get("topic") in normalized_q:
+            score += 0.10
+
+        # Specific high-confidence domain boosts
+        if ("jcb" in query_tokens or "backhoe" in query_tokens) and item["topic"] == "backhoe operation":
+            score += 0.35
+        if ("trench" in query_tokens or "trenching" in query_tokens) and "trench" in item["topic"]:
+            score += 0.35
+        if any(k in query_tokens for k in ["inspection", "walkaround", "check", "morning"]) and "inspection" in item["topic"]:
+            score += 0.35
+        if any(k in query_tokens for k in ["idle", "fuel", "diesel", "consumption"]) and "idle" in item["topic"]:
+            score += 0.35
+        if ("loader" in query_tokens) and "loading" in item["topic"]:
+            score += 0.35
+        if ("dozer" in query_tokens or "grading" in query_tokens or "grade" in query_tokens) and "grading" in item["topic"]:
+            score += 0.35
+        if any(k in query_tokens for k in ["hydraulic", "pressure", "cylinders", "leak"]) and "maintenance" in item["topic"]:
+            score += 0.35
+        if ("excavator" in query_tokens and not any(k in query_tokens for k in ["jcb", "backhoe", "trench", "inspection", "idle", "fuel", "hydraulic"])) and "excavator" in item["topic"]:
+            score += 0.35
+
+        # Machine context boost
+        if machine_type and machine_type.lower() in item["title"].lower():
             score += 0.05
-        if "safety" in normalized and "safety" in item.topic:
-            score += 0.05
-        results.append({"video_id": item.video_id, "title": item.title, "description": item.description, "source": item.source, "relevance_score": round(min(score, 1.0), 2)})
-    results.sort(key=lambda row: row["relevance_score"], reverse=True)
-    return {"allowed": True, "reason": "DOMAIN VALIDATED", "query": contextual_query, "results": results[:5]}
+
+        catalog_scored.append({
+            "video_id": item["video_id"],
+            "title": item["title"],
+            "description": item["description"],
+            "source": item["source"],
+            "category": item.get("category", category),
+            "relevance_score": round(min(score, 0.99), 2),
+            "thumbnail_url": f"https://img.youtube.com/vi/{item['video_id']}/mqdefault.jpg",
+        })
+
+    # Combine results, prioritizing YouTube Live results if available, then top curated matches
+    combined: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+
+    for item in youtube_results:
+        if item["video_id"] not in seen_ids and item["video_id"] != "dQw4w9WgXcQ":
+            combined.append(item)
+            seen_ids.add(item["video_id"])
+
+    catalog_scored.sort(key=lambda x: x["relevance_score"], reverse=True)
+    for item in catalog_scored:
+        if item["video_id"] not in seen_ids and item["video_id"] != "dQw4w9WgXcQ":
+            combined.append(item)
+            seen_ids.add(item["video_id"])
+
+    # Ensure the top discovered training items are saved to the database for future reference
+    for top_item in combined[:3]:
+        existing = db.scalar(select(TrainingContent).where(TrainingContent.video_id == top_item["video_id"]))
+        if not existing:
+            new_record = TrainingContent(
+                video_id=top_item["video_id"],
+                title=top_item["title"],
+                description=top_item["description"],
+                topic=top_item.get("category", category).lower(),
+                source=top_item["source"],
+                relevance_score=top_item["relevance_score"],
+            )
+            db.add(new_record)
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+
+    return {
+        "allowed": True,
+        "reason": ai_classification.get("reason", "DOMAIN VALIDATED"),
+        "query": query,
+        "category": category,
+        "ai_expanded_query": expanded_query,
+        "suggested_queries": ai_classification.get("suggested_queries", []),
+        "results": combined[:6],
+    }
 
 
 def complete_training(db: Session, operator_id: int, before_metric: float, after_metric: float, metric_name: str, training_content_id: int) -> dict[str, Any]:

@@ -104,12 +104,17 @@ class TrainingItem(BaseModel):
     description: str
     source: str
     relevance_score: float
+    category: str | None = None
+    thumbnail_url: str | None = None
 
 
 class TrainingSearchResponse(BaseModel):
     allowed: bool
     reason: str
     query: str
+    category: str | None = None
+    ai_expanded_query: str | None = None
+    suggested_queries: list[str] = Field(default_factory=list)
     results: list[TrainingItem] = Field(default_factory=list)
 
 

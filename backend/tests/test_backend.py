@@ -110,6 +110,23 @@ def test_domain_guard_accepts_and_rejects():
     assert allow.status_code == 200
     assert allow.json()["allowed"] is True
     assert reject.json()["allowed"] is False
+    assert "culinary" in reject.json()["reason"].lower() or "recipe" in reject.json()["reason"].lower()
+    assert len(reject.json()["suggested_queries"]) > 0
+
+
+def test_domain_guard_natural_language_jcb():
+    headers = auth_headers("operator@catguardian.demo", "Operator123!")
+    res = client.post("/training/search", headers=headers, json={"query": "How do I use a jcb"})
+    assert res.status_code == 200
+    data = res.json()
+    assert data["allowed"] is True
+    assert data["category"] == "Backhoe & JCB Operations"
+    assert len(data["results"]) > 0
+    top = data["results"][0]
+    assert "jcb" in top["title"].lower() or "backhoe" in top["title"].lower()
+    # Ensure Rick Astley is never returned!
+    assert not any(item["video_id"] == "dQw4w9WgXcQ" for item in data["results"])
+    assert not any("rick" in item["title"].lower() for item in data["results"])
 
 
 def test_training_completion_records_change():
