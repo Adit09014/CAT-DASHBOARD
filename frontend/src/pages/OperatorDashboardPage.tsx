@@ -1,307 +1,469 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, BrainCircuit, Mic, MicOff, PlayCircle, RefreshCcw, ShieldAlert, Sparkles, Target } from 'lucide-react';
+import {
+  ShieldCheck,
+  Activity,
+  Sparkles,
+  RefreshCcw,
+  LogOut,
+  BrainCircuit,
+  Sliders,
+  Compass,
+  Award,
+  Bot,
+  Gauge,
+  Layers,
+  ChevronRight,
+  TrendingDown,
+} from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../services/auth';
-import { Panel } from '../components/Panel';
-import { MetricCard } from '../components/MetricCard';
 import { StatusBadge } from '../components/StatusBadge';
+import { MetricCard } from '../components/MetricCard';
+import { Panel } from '../components/Panel';
+import { SafetyChecklist } from '../components/SafetyChecklist';
+import { TelemetryChart } from '../components/TelemetryChart';
+import { WhatIfPanel } from '../components/WhatIfPanel';
+import { PredictiveSafetyMap } from '../components/PredictiveSafetyMap';
+import { DomainGuardTraining } from '../components/DomainGuardTraining';
+import { CopilotPanel } from '../components/CopilotPanel';
 
-type SafetySimulation = {
-  state: 'NORMAL' | 'CAUTION' | 'WARNING' | 'CRITICAL' | 'UNKNOWN';
-  advisory: string;
-  seconds_to_conflict: number | null;
-  minimum_distance_meters: number;
-  trajectory: Array<{
-    second: number;
-    machine: { x: number; y: number; velocity: number; heading: number };
-    object: { x: number; y: number; velocity: number; heading: number };
-    distance_meters: number;
-  }>;
-  label: string;
-};
+type OperatorTab = 'overview' | 'safety-gate' | 'telemetry' | 'what-if' | 'proximity' | 'training' | 'copilot';
 
 export function OperatorDashboardPage() {
   const { user, logout } = useAuth();
   const queryClient = useQueryClient();
-  const [copilotQuestion, setCopilotQuestion] = useState('Why did I get this warning?');
-  const [copilotAnswer, setCopilotAnswer] = useState('');
-  const [trainingQuery, setTrainingQuery] = useState('How do I reduce excavator idle time?');
-  const [trainingResult, setTrainingResult] = useState<string>('');
-  const [safetySimulation, setSafetySimulation] = useState<SafetySimulation | null>(null);
-  const [voiceSupported, setVoiceSupported] = useState(false);
-  const [voiceListening, setVoiceListening] = useState(false);
-  const recognitionRef = useRef<any>(null);
+  const [activeTab, setActiveTab] = useState<OperatorTab>('overview');
 
-  const dashboard = useQuery({
+  const dashboardQuery = useQuery({
     queryKey: ['operator-dashboard'],
     queryFn: async () => (await api.get('/operator/dashboard')).data,
+    refetchInterval: 10000,
   });
 
-  useEffect(() => {
-    if (dashboard.data?.ai_insight?.message) {
-      setCopilotAnswer(dashboard.data.ai_insight.message as string);
-    }
-  }, [dashboard.data]);
-
-  useEffect(() => {
-    setVoiceSupported(typeof window !== 'undefined' && ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window));
-    const SpeechRecognitionCtor = (window as Window & { SpeechRecognition?: any; webkitSpeechRecognition?: any }).SpeechRecognition
-      ?? (window as Window & { SpeechRecognition?: any; webkitSpeechRecognition?: any }).webkitSpeechRecognition;
-    if (SpeechRecognitionCtor) {
-      recognitionRef.current = new SpeechRecognitionCtor();
-      recognitionRef.current.continuous = false;
-      recognitionRef.current.interimResults = false;
-      recognitionRef.current.lang = 'en-US';
-      recognitionRef.current.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript as string;
-        setCopilotQuestion(transcript);
-        setVoiceListening(false);
-      };
-      recognitionRef.current.onend = () => setVoiceListening(false);
-    }
-  }, []);
-
-  const speak = (text: string) => {
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 1;
-    utterance.pitch = 1;
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(utterance);
+  const refreshData = () => {
+    queryClient.invalidateQueries({ queryKey: ['operator-dashboard'] });
   };
 
-  const trajectorySvg = useMemo(() => {
-    const points = safetySimulation?.trajectory ?? [];
-    return points.map((point, index) => {
-      const machineX = 24 + index * 18;
-      const machineY = 120 - point.machine.y * 0.25;
-      const objectX = 24 + index * 18;
-      const objectY = 120 - point.object.y * 0.25;
-      const lineY = 120 - point.distance_meters * 3;
-      return { index, machineX, machineY, objectX, objectY, lineY, point };
-    });
-  }, [safetySimulation]);
+  const handleAdvanceSimulation = async () => {
+    try {
+      await api.post('/telemetry/next-tick');
+      refreshData();
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
-  const safetyState = dashboard.data?.safety_status?.allowed === false ? 'red' : dashboard.data?.safety_status?.warnings?.length ? 'amber' : 'green';
-  const idle = dashboard.data?.current_telemetry?.idle_time ?? 0;
-  const baseline = dashboard.data?.machine_health?.baseline_idle ?? 0;
-  const ratio = baseline ? (idle / baseline).toFixed(1) : '0.0';
+  const data = dashboardQuery.data;
+  const currentMachine = data?.current_machine ?? {};
+  const currentTask = data?.current_task ?? {};
+  const telemetry = data?.current_telemetry ?? {};
+  const safety = data?.safety_status ?? {};
+  const prediction = data?.task_prediction ?? {};
+  const insight = data?.ai_insight ?? {};
+  const health = data?.machine_health ?? {};
+  const weather = data?.weather ?? {};
+
+  const baselineIdle = health.baseline_idle ?? 18.0;
+  const currentIdle = telemetry.idle_time ?? 18.0;
+  const idleRatio = baselineIdle > 0 ? (currentIdle / baselineIdle).toFixed(1) : '1.0';
+  const isAnomaly = currentIdle >= baselineIdle * 1.5;
+
+  const safetyState =
+    safety.allowed === false ? 'red' : safety.warnings?.length ? 'amber' : 'green';
+
+  const navItems = [
+    { id: 'overview' as OperatorTab, label: 'Cockpit Overview', icon: <Layers size={18} />, badge: null },
+    {
+      id: 'safety-gate' as OperatorTab,
+      label: 'Pre-Task Safety Gate',
+      icon: <ShieldCheck size={18} />,
+      status: safety.allowed === false ? 'BLOCKED' : 'READY',
+      statusColor: safety.allowed === false ? 'text-red-400 bg-red-950/60 border-red-800' : 'text-emerald-400 bg-emerald-950/60 border-emerald-800',
+    },
+    {
+      id: 'telemetry' as OperatorTab,
+      label: 'Telemetry & Baseline',
+      icon: <Activity size={18} />,
+      status: isAnomaly ? 'ANOMALY' : 'NOMINAL',
+      statusColor: isAnomaly ? 'text-red-400 bg-red-950/60 border-red-800' : 'text-slate-400 bg-slate-900 border-slate-800',
+    },
+    { id: 'what-if' as OperatorTab, label: 'What-If Simulator', icon: <Sliders size={18} />, badge: 'Hero Feature' },
+    { id: 'proximity' as OperatorTab, label: 'Predictive Proximity', icon: <Compass size={18} />, badge: 'Hero Feature' },
+    { id: 'training' as OperatorTab, label: 'Domain-Guarded Training', icon: <Award size={18} />, badge: 'Hero Feature' },
+    { id: 'copilot' as OperatorTab, label: 'Machine AI Copilot', icon: <Bot size={18} />, badge: 'Voice / TTS' },
+  ];
 
   return (
-    <div className="app-shell">
-      <header className="topbar">
-        <div>
-          <div className="eyebrow">CAT Guardian</div>
-          <h1 className="page-title">Machine {dashboard.data?.current_machine?.machine_code ?? 'EXC-001'}</h1>
-          <p className="page-copy">Safety first, then prediction, then simulation. Built for the field, not a generic dashboard.</p>
-        </div>
+    <div className="min-h-screen bg-[#090d14] text-[#e5eefb]">
+      {/* Top Navbar */}
+      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-800 bg-slate-950/90 px-6 py-3.5 backdrop-blur-xl">
         <div className="flex items-center gap-3">
-          <StatusBadge state={safetyState} label={dashboard.data?.safety_status?.allowed === false ? 'Task Blocked' : 'Safety Ready'} />
-          <button className="secondary-button" onClick={() => logout()}>Logout</button>
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500 font-black text-xs text-slate-950 shadow-md">
+            CAT
+          </span>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold text-white tracking-wide">
+                Machine {currentMachine.machine_code || 'EXC-001'}
+              </span>
+              <span className="text-xs text-slate-400 font-normal">
+                ({currentMachine.machine_type || 'Excavator'})
+              </span>
+              <StatusBadge
+                state={safetyState}
+                label={safety.allowed === false ? 'Gate Blocked' : 'Gate Passed'}
+              />
+            </div>
+            <div className="text-[11px] text-slate-400">
+              Operator: <strong className="text-slate-200">Avery Stone</strong> · Active Mission:{' '}
+              <strong className="text-amber-400">{currentTask.task_type || 'Excavation'}</strong>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={handleAdvanceSimulation}
+            className="flex items-center gap-1.5 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3.5 py-1.5 text-xs font-bold text-amber-300 transition-all hover:bg-amber-500/20"
+            title="Advance simulated telemetry to trigger idle drift"
+          >
+            <Activity size={14} />
+            <span className="hidden sm:inline">Advance Telemetry</span>
+          </button>
+
+          <button
+            onClick={refreshData}
+            className="flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-300 transition-all hover:bg-slate-800"
+            title="Refresh Dashboard State"
+          >
+            <RefreshCcw size={13} />
+          </button>
+
+          <button
+            onClick={() => logout()}
+            className="flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-300 transition-all hover:bg-slate-800"
+          >
+            <LogOut size={13} />
+            <span>Logout</span>
+          </button>
         </div>
       </header>
 
-      <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-        <div className="space-y-6">
-          <Panel title="Today’s Task">
-            <div className="space-y-4">
-              <div className="flex flex-wrap items-center gap-3">
-                <h2 className="text-3xl font-semibold text-white">{dashboard.data?.current_task?.task_type ?? 'Excavation'}</h2>
-                <StatusBadge state={safetyState} label={dashboard.data?.safety_status?.allowed === false ? 'Task Blocked' : 'Safety Check Passed'} />
+      {/* Main Layout: Left Sidebar Navigation + Right Content Area */}
+      <div className="flex min-h-[calc(100vh-65px)]">
+        {/* Left Navigation Sidebar Box */}
+        <aside className="w-64 flex-shrink-0 border-r border-slate-800/80 bg-slate-950/70 p-4 flex flex-col justify-between">
+          <div className="space-y-5">
+            <div>
+              <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-500 px-3 mb-2">
+                In-Cab Console
               </div>
-              <p className="max-w-2xl text-slate-300">{dashboard.data?.current_task?.description ?? 'Foundation cut on Lot A'}</p>
-              {dashboard.data?.safety_status?.blocking_reasons?.length ? (
-                <div className="alert-red">
-                  <ShieldAlert size={16} />
-                  <span>{dashboard.data.safety_status.blocking_reasons.join('. ')}</span>
-                </div>
-              ) : null}
+              <nav className="space-y-1">
+                {navItems.map((item) => {
+                  const isActive = activeTab === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => setActiveTab(item.id)}
+                      className={`group flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-xs font-semibold transition-all ${
+                        isActive
+                          ? 'border border-amber-500/40 bg-amber-500/15 text-amber-300 shadow-md shadow-amber-500/5'
+                          : 'border border-transparent text-slate-400 hover:border-slate-800 hover:bg-slate-900 hover:text-slate-200'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <span className={isActive ? 'text-amber-400' : 'text-slate-400 group-hover:text-slate-200'}>
+                          {item.icon}
+                        </span>
+                        <span>{item.label}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        {item.status && (
+                          <span
+                            className={`rounded border px-1.5 py-0.5 text-[9px] font-mono font-bold ${item.statusColor}`}
+                          >
+                            {item.status}
+                          </span>
+                        )}
+                        {item.badge && (
+                          <span className="rounded bg-gradient-to-r from-amber-500 to-amber-600 px-1.5 py-0.5 text-[9px] font-black text-slate-950 uppercase">
+                            {item.badge}
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </nav>
             </div>
-          </Panel>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <MetricCard label="Safety" value={dashboard.data?.safety_status?.allowed === false ? 'Blocked' : 'Ready'} delta={dashboard.data?.safety_status?.warnings?.length ? 'Warnings' : 'Clear'} footnote="Digital workflow gate only." />
-            <MetricCard label="Task Prediction" value={`${dashboard.data?.task_prediction?.predicted_duration ?? 0} min`} delta={dashboard.data?.task_prediction?.label ?? 'Estimated'} footnote="Model-based estimate, not a guarantee." />
+            {/* Quick Cab Telemetry Summary Pill Box */}
+            <div className="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-3.5 space-y-2 text-xs">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Machine Vitals</div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Engine Idle:</span>
+                <span className={`font-mono font-bold ${isAnomaly ? 'text-red-400' : 'text-amber-400'}`}>
+                  {currentIdle.toFixed(0)} min ({idleRatio}×)
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Seatbelt:</span>
+                <span className={`font-bold ${telemetry.seatbelt_status ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {telemetry.seatbelt_status ? 'Locked' : 'Unbuckled'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Predicted Time:</span>
+                <span className="font-mono text-white font-bold">{prediction.predicted_duration ?? 62} min</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Site Weather:</span>
+                <span className="text-sky-300">{weather.condition || 'Cloudy'} ({weather.temperature ?? 22}°C)</span>
+              </div>
+            </div>
           </div>
 
-          <Panel title="Machine Telemetry">
-            <div className="telemetry-grid">
+          <div className="border-t border-slate-800/60 pt-3 text-[11px] text-slate-500 text-center">
+            CAT Guardian In-Cab Tablet v2.4
+          </div>
+        </aside>
+
+        {/* Right Content Area */}
+        <main className="flex-1 p-6 lg:p-8 overflow-y-auto">
+          {/* TAB 1: COCKPIT OVERVIEW */}
+          {activeTab === 'overview' && (
+            <div className="space-y-6">
               <div>
-                <div className="telemetry-label">Idle vs baseline</div>
-                <div className="telemetry-value">{idle.toFixed(0)} min</div>
-                <div className="telemetry-caption">Your normal idle time: {baseline.toFixed(0)} min</div>
-                <div className="telemetry-caption strong">{ratio}× above your baseline</div>
+                <h2 className="text-2xl font-bold text-white">Machine Operator Cockpit</h2>
+                <p className="text-sm text-slate-400">
+                  Real-time telemetry, pre-task digital checklist status, and AI mission assistance.
+                </p>
               </div>
-              <div className="telemetry-bars" aria-label="Idle time comparison">
-                <div className="telemetry-bar baseline" style={{ height: `${Math.max(18, baseline)}%` }} />
-                <div className="telemetry-bar current" style={{ height: `${Math.max(18, idle)}%` }} />
-              </div>
-            </div>
-          </Panel>
 
-          <Panel title="AI Insight">
-            <div className="insight-card">
-              <BrainCircuit className="text-amber-300" size={22} />
-              <div>
-                <div className="text-lg font-semibold text-white">{dashboard.data?.ai_insight?.title ?? 'Operator baseline intelligence'}</div>
-                <div className="mt-1 text-slate-300">{dashboard.data?.ai_insight?.message ?? 'Waiting for telemetry.'}</div>
+              {/* KPI Cards */}
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <MetricCard
+                  label="Safety Checklist Gate"
+                  value={safety.allowed === false ? 'Blocked' : 'Cleared'}
+                  delta={safety.allowed === false ? 'Action Required' : 'Ready'}
+                  footnote="Digital safety verification"
+                />
+                <MetricCard
+                  label="Idle vs Baseline"
+                  value={`${currentIdle.toFixed(0)} min`}
+                  delta={`${idleRatio}× Normal`}
+                  footnote={`Your personal baseline: ${baselineIdle.toFixed(0)} min`}
+                />
+                <MetricCard
+                  label="Task Predicted Time"
+                  value={`${prediction.predicted_duration ?? 62} min`}
+                  delta={prediction.model_version || 'RandomForest v1.2'}
+                  footnote="Weather & machine regression"
+                />
+                <MetricCard
+                  label="Site Environment"
+                  value={weather.condition || 'Cloudy'}
+                  delta={`${weather.temperature ?? 22}°C · ${weather.wind ?? 6} km/h`}
+                  footnote="Environmental risk analysis"
+                />
               </div>
-            </div>
-          </Panel>
-        </div>
 
-        <div className="space-y-6">
-          <Panel title="What-If Mission Simulator">
-            <div className="whatif-card">
-              <div className="whatif-column">
-                <div className="whatif-label">Current</div>
-                <div className="whatif-number">{dashboard.data?.what_if?.current?.duration ?? 74} min</div>
-                <div className="whatif-sub">{dashboard.data?.what_if?.current?.fuel ?? 19.2} L</div>
-                <StatusBadge state="amber" label={dashboard.data?.what_if?.current?.risk ?? 'Medium Risk'} />
-              </div>
-              <ArrowRight className="self-center text-slate-500" size={28} />
-              <div className="whatif-column highlight">
-                <div className="whatif-label">Simulated</div>
-                <div className="whatif-number">{dashboard.data?.what_if?.simulated?.duration ?? 66} min</div>
-                <div className="whatif-sub">{dashboard.data?.what_if?.simulated?.fuel ?? 16.8} L</div>
-                <StatusBadge state="green" label={dashboard.data?.what_if?.simulated?.risk ?? 'Lower Risk'} />
-              </div>
-            </div>
-            <div className="mt-4 grid grid-cols-2 gap-3 text-sm text-slate-300">
-              <div className="rounded-2xl border border-slate-700 bg-slate-950/70 p-3">Time: {dashboard.data?.what_if?.deltas?.duration ?? -8} min</div>
-              <div className="rounded-2xl border border-slate-700 bg-slate-950/70 p-3">Fuel: {dashboard.data?.what_if?.deltas?.fuel ?? -2.4} L</div>
-            </div>
-            <p className="mt-4 text-sm text-slate-400">{dashboard.data?.what_if?.label ?? 'Model-based estimate. Actual results may vary.'}</p>
-          </Panel>
-
-          <Panel title="Predictive Safety">
-            <div className="space-y-4">
-              <div className="flex flex-wrap items-center gap-3">
-                <button
-                  className="primary-button"
-                  onClick={async () => {
-                    const response = await api.post('/safety/simulate', { task_id: dashboard.data?.current_task?.id ?? 1, horizon_seconds: 30, threshold_meters: 8 });
-                    setSafetySimulation(response.data);
-                  }}
+              {/* Quick Feature Jump Cards */}
+              <div className="grid gap-4 md:grid-cols-3">
+                <div
+                  onClick={() => setActiveTab('safety-gate')}
+                  className="group cursor-pointer rounded-2xl border border-slate-800 bg-slate-950/70 p-5 hover:border-amber-400/50 transition-all"
                 >
-                  <ShieldAlert size={16} />Simulate proximity
-                </button>
-                <button
-                  className="secondary-button"
-                  onClick={async () => {
-                    await api.post('/demo/reset');
-                    await queryClient.invalidateQueries({ queryKey: ['operator-dashboard'] });
-                    setSafetySimulation(null);
-                  }}
-                >
-                  <RefreshCcw size={16} />Reset demo
-                </button>
-              </div>
-
-              <div className="rounded-3xl border border-slate-700 bg-slate-950/80 p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-xs uppercase tracking-[0.28em] text-slate-400">Trajectory</div>
-                    <div className="mt-1 text-lg font-semibold text-white">{safetySimulation?.state ?? 'NORMAL'}</div>
+                  <div className="flex items-center justify-between">
+                    <ShieldCheck size={22} className="text-emerald-400" />
+                    <ChevronRight size={16} className="text-slate-500 group-hover:translate-x-1 transition-transform" />
                   </div>
-                  <StatusBadge state={safetySimulation?.state === 'CRITICAL' ? 'red' : safetySimulation?.state === 'WARNING' ? 'amber' : safetySimulation?.state === 'CAUTION' ? 'blue' : 'green'} label={safetySimulation?.state ?? 'NORMAL'} />
+                  <h3 className="mt-3 font-bold text-white text-base">Safety Checklist Gate</h3>
+                  <p className="mt-1 text-xs text-slate-400">
+                    Verify seatbelt sensors, machine hydraulics, and clear safety zone before commencing work.
+                  </p>
                 </div>
-                <svg viewBox="0 0 380 160" className="mt-4 h-40 w-full">
-                  <defs>
-                    <linearGradient id="machinePath" x1="0" x2="1">
-                      <stop offset="0%" stopColor="#3b82f6" />
-                      <stop offset="100%" stopColor="#f59e0b" />
-                    </linearGradient>
-                  </defs>
-                  <rect x="0" y="0" width="380" height="160" rx="18" fill="rgba(15,23,42,0.32)" />
-                  {trajectorySvg.length ? trajectorySvg.map(({ index, machineX, machineY, objectX, objectY, lineY, point }) => (
-                    <g key={index}>
-                      <line x1={machineX} y1={machineY} x2={objectX} y2={objectY} stroke="rgba(245,158,11,0.25)" strokeDasharray="3 3" />
-                      <circle cx={machineX} cy={machineY} r={4} fill="#3b82f6" />
-                      <circle cx={objectX} cy={objectY} r={4} fill="#f59e0b" />
-                      {index % 6 === 0 ? <text x={machineX + 4} y={lineY} fill="#cbd5e1" fontSize="10">{point.second}s</text> : null}
-                    </g>
-                  )) : (
-                    <text x="22" y="82" fill="#94a3b8" fontSize="13">Run a simulation to preview machine and object trajectories.</text>
-                  )}
-                </svg>
-                <div className="mt-3 grid gap-3 md:grid-cols-3 text-sm text-slate-300">
-                  <div className="rounded-2xl border border-slate-700 bg-slate-950/70 p-3">Conflict: {safetySimulation?.seconds_to_conflict ?? 'N/A'} sec</div>
-                  <div className="rounded-2xl border border-slate-700 bg-slate-950/70 p-3">Min distance: {safetySimulation?.minimum_distance_meters?.toFixed(1) ?? 'N/A'} m</div>
-                  <div className="rounded-2xl border border-slate-700 bg-slate-950/70 p-3">{safetySimulation?.label ?? 'Model-based trajectory simulation'}</div>
+
+                <div
+                  onClick={() => setActiveTab('what-if')}
+                  className="group cursor-pointer rounded-2xl border border-amber-500/30 bg-gradient-to-br from-amber-500/10 to-slate-950 p-5 hover:border-amber-400 transition-all"
+                >
+                  <div className="flex items-center justify-between">
+                    <Sliders size={22} className="text-amber-400" />
+                    <ChevronRight size={16} className="text-amber-400 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                  <h3 className="mt-3 font-bold text-white text-base">What-If Mission Simulator</h3>
+                  <p className="mt-1 text-xs text-slate-300">
+                    Test fuel-saving decisions and idle reduction to see immediate time & fuel deltas.
+                  </p>
                 </div>
-                <p className="mt-3 text-sm text-slate-400">{safetySimulation?.advisory ?? 'Predictive safety simulates future positions without controlling the machine.'}</p>
-              </div>
-            </div>
-          </Panel>
 
-          <Panel title="Training Recommendation">
-            <div className="space-y-4">
-              <div className="rounded-3xl border border-amber-500/20 bg-amber-500/10 p-4">
-                <div className="flex items-center gap-3 text-amber-200"><Sparkles size={16} />{dashboard.data?.training_recommendation?.title ?? 'Idle Optimization Training'}</div>
-                <p className="mt-2 text-sm text-amber-50/85">{dashboard.data?.training_recommendation?.description ?? 'Recommended because excessive idle was detected.'}</p>
+                <div
+                  onClick={() => setActiveTab('proximity')}
+                  className="group cursor-pointer rounded-2xl border border-sky-500/30 bg-gradient-to-br from-sky-500/10 to-slate-950 p-5 hover:border-sky-400 transition-all"
+                >
+                  <div className="flex items-center justify-between">
+                    <Compass size={22} className="text-sky-400" />
+                    <ChevronRight size={16} className="text-sky-400 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                  <h3 className="mt-3 font-bold text-white text-base">Predictive Proximity Radar</h3>
+                  <p className="mt-1 text-xs text-slate-300">
+                    2D trajectory lookahead calculating potential collisions with haul trucks up to 45 seconds out.
+                  </p>
+                </div>
               </div>
-              <form
-                className="space-y-3"
-                onSubmit={async (event) => {
-                  event.preventDefault();
-                  const response = await api.post('/training/search', { query: trainingQuery, operator_id: user?.id, machine_type: dashboard.data?.current_machine?.machine_type });
-                  setTrainingResult(response.data.allowed ? `${response.data.reason} ✓` : response.data.reason);
-                }}
-              >
-                <label className="field">
-                  <span>Ask for training</span>
-                  <input value={trainingQuery} onChange={(event) => setTrainingQuery(event.target.value)} />
-                </label>
-                <button className="primary-button" type="submit"><Target size={16} />Search training</button>
-              </form>
-              <div className="text-sm text-slate-300">{trainingResult || 'Domain guard validates whether the request is operator training related.'}</div>
-            </div>
-          </Panel>
 
-          <Panel title="Machine-Aware Copilot">
-            <div className="space-y-3">
-              <textarea className="copilot-input" value={copilotQuestion} onChange={(event) => setCopilotQuestion(event.target.value)} rows={3} />
-              <div className="flex flex-wrap gap-3">
-                <button
-                  className="primary-button"
-                  onClick={async () => {
-                    const response = await api.post('/copilot/ask', { question: copilotQuestion });
-                    setCopilotAnswer(response.data.answer);
-                    speak(response.data.answer);
-                  }}
-                >
-                  <PlayCircle size={16} />Ask copilot
-                </button>
-                <button
-                  className="secondary-button"
-                  disabled={!voiceSupported || !recognitionRef.current}
-                  onClick={() => {
-                    if (!recognitionRef.current) return;
-                    if (voiceListening) {
-                      recognitionRef.current.stop();
-                      setVoiceListening(false);
-                      return;
-                    }
-                    recognitionRef.current.start();
-                    setVoiceListening(true);
-                  }}
-                >
-                  {voiceListening ? <MicOff size={16} /> : <Mic size={16} />} {voiceListening ? 'Stop voice' : 'Push to talk'}
-                </button>
-                <button className="secondary-button" onClick={async () => {
-                  await api.post('/telemetry/next-tick');
-                  await queryClient.invalidateQueries({ queryKey: ['operator-dashboard'] });
-                }}>
-                  <RefreshCcw size={16} />Advance simulation
-                </button>
+              {/* Task Details & AI Intelligence Insight Panel */}
+              <div className="grid gap-6 lg:grid-cols-2">
+                <Panel title="Current Work Order">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xl font-bold text-white">{currentTask.task_type || 'Excavation'}</h3>
+                      <StatusBadge state={safetyState} label={currentTask.status || 'Scheduled'} />
+                    </div>
+                    <p className="text-sm text-slate-300 leading-relaxed">
+                      {currentTask.description || 'Foundation cut on Lot A. Excavate trench line according to engineering grade.'}
+                    </p>
+                    <div className="grid grid-cols-2 gap-2 text-xs border-t border-slate-800/80 pt-3">
+                      <div>
+                        <span className="text-slate-500 block">Planned Duration:</span>
+                        <span className="font-semibold text-white">{currentTask.estimated_duration ?? 74} minutes</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block">Assigned Machine:</span>
+                        <span className="font-semibold text-amber-300">{currentMachine.machine_code || 'EXC-001'}</span>
+                      </div>
+                    </div>
+                  </div>
+                </Panel>
+
+                <Panel title="Operator Baseline Intelligence">
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-amber-500/20 text-amber-400">
+                        <BrainCircuit size={20} />
+                      </div>
+                      <div>
+                        <h4 className="text-base font-bold text-white">{insight.title || 'Personal Baseline Monitoring'}</h4>
+                        <p className="mt-1 text-xs text-slate-300 leading-relaxed">
+                          {insight.message || `Typical idle time for excavation is ${baselineIdle.toFixed(0)} min. Monitoring shifts.`}
+                        </p>
+                      </div>
+                    </div>
+                    {isAnomaly && (
+                      <div className="rounded-xl border border-red-500/30 bg-red-950/30 p-2.5 text-xs text-red-200">
+                        <strong>Anomaly Alert:</strong> Idling has reached {currentIdle.toFixed(0)} min ({idleRatio}× baseline). Shut down during truck loading queues to conserve fuel.
+                      </div>
+                    )}
+                  </div>
+                </Panel>
               </div>
-              <div className="text-xs uppercase tracking-[0.25em] text-slate-500">{voiceSupported ? 'Voice input available' : 'Voice not available in this browser'}</div>
-              <div className="rounded-3xl border border-slate-700 bg-slate-950/80 p-4 text-sm text-slate-200">{copilotAnswer || 'Copilot response appears here.'}</div>
             </div>
-          </Panel>
-        </div>
+          )}
+
+          {/* TAB 2: PRE-TASK SAFETY GATE */}
+          {activeTab === 'safety-gate' && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-2xl font-bold text-white">Pre-Task Digital Safety Gate</h2>
+                <p className="text-sm text-slate-400">
+                  Mandatory pre-operational compliance verification. Machine start is digitally gated until seatbelt and zone checks pass.
+                </p>
+              </div>
+              <SafetyChecklist
+                taskId={currentTask.id || 1}
+                safetyStatus={safety}
+                seatbeltFastened={Boolean(telemetry.seatbelt_status)}
+                weatherCondition={weather.condition || 'Cloudy'}
+                onRefresh={refreshData}
+              />
+            </div>
+          )}
+
+          {/* TAB 3: TELEMETRY & BASELINE */}
+          {activeTab === 'telemetry' && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-2xl font-bold text-white">Machine Telemetry & Personal Baseline</h2>
+                <p className="text-sm text-slate-400">
+                  Continuous sensor readings compared against your historical operator baseline to flag excessive idling and fuel spikes.
+                </p>
+              </div>
+              <TelemetryChart
+                currentIdle={currentIdle}
+                baselineIdle={baselineIdle}
+                fuelUsed={telemetry.fuel_used ?? 18.2}
+                engineLoad={telemetry.engine_load ?? 58.0}
+                loadCycles={telemetry.load_cycles ?? 26}
+                engineHours={telemetry.engine_hours ?? 131.5}
+              />
+            </div>
+          )}
+
+          {/* TAB 4: WHAT-IF SIMULATOR */}
+          {activeTab === 'what-if' && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-2xl font-bold text-white">What-If Mission Simulator</h2>
+                <p className="text-sm text-slate-400">
+                  Test operational scenarios before acting. Drag sliders to adjust idle reduction and weather, and observe immediate model recalculations.
+                </p>
+              </div>
+              <WhatIfPanel
+                taskId={currentTask.id || 1}
+                initialData={data?.what_if}
+              />
+            </div>
+          )}
+
+          {/* TAB 5: PREDICTIVE PROXIMITY */}
+          {activeTab === 'proximity' && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-2xl font-bold text-white">Predictive Safety Trajectory Radar</h2>
+                <p className="text-sm text-slate-400">
+                  2D trajectory lookahead forecasting positions of the machine and nearby hazards to issue early proximity conflict advisories.
+                </p>
+              </div>
+              <PredictiveSafetyMap taskId={currentTask.id || 1} />
+            </div>
+          )}
+
+          {/* TAB 6: DOMAIN-GUARDED TRAINING */}
+          {activeTab === 'training' && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-2xl font-bold text-white">Domain-Guarded Training & Closed-Loop Learning</h2>
+                <p className="text-sm text-slate-400">
+                  Targeted CAT training search filtered strictly to heavy machinery operation, plus closed-loop metric verification.
+                </p>
+              </div>
+              <DomainGuardTraining
+                operatorId={user?.id || 2}
+                machineType={currentMachine.machine_type || 'Excavator'}
+                recommendedTopic={data?.training_recommendation?.title}
+              />
+            </div>
+          )}
+
+          {/* TAB 7: MACHINE AI COPILOT */}
+          {activeTab === 'copilot' && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-2xl font-bold text-white">Machine-Aware Voice & Text AI Copilot</h2>
+                <p className="text-sm text-slate-400">
+                  Hands-free cab assistant grounded in live telemetry, warning codes, and shift parameters. Supports push-to-talk voice input and text-to-speech audio.
+                </p>
+              </div>
+              <CopilotPanel
+                machineCode={currentMachine.machine_code || 'EXC-001'}
+                taskType={currentTask.task_type || 'Excavation'}
+                initialMessage={insight.message}
+              />
+            </div>
+          )}
+        </main>
       </div>
     </div>
   );

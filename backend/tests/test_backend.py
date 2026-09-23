@@ -117,3 +117,28 @@ def test_training_completion_records_change():
     response = client.post("/training/1/complete", headers=headers, json={"operator_id": 2, "before_metric": 34, "after_metric": 24, "metric_name": "idle_time", "training_content_id": 1})
     assert response.status_code == 200
     assert response.json()["observed_change_percent"] < 0
+
+
+def test_toggle_seatbelt():
+    headers = auth_headers("operator@catguardian.demo", "Operator123!")
+    res1 = client.post("/telemetry/toggle-seatbelt", headers=headers)
+    assert res1.status_code == 200
+    assert "seatbelt_status" in res1.json()
+    status1 = res1.json()["seatbelt_status"]
+    res2 = client.post("/telemetry/toggle-seatbelt", headers=headers)
+    assert res2.status_code == 200
+    assert res2.json()["seatbelt_status"] != status1
+
+
+def test_admin_safety_events_and_recommendation():
+    admin_headers = auth_headers("admin@catguardian.demo", "Admin123!")
+    events = client.get("/admin/safety-events", headers=admin_headers)
+    assert events.status_code == 200
+    assert isinstance(events.json(), list)
+
+    rec = client.post("/admin/recommend-assignment?task_id=1", headers=admin_headers)
+    assert rec.status_code == 200
+    rec_body = rec.json()
+    assert "recommended_operator_id" in rec_body
+    assert "score" in rec_body
+    assert rec_body["score"] > 0

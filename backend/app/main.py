@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
+
 from fastapi import Depends, FastAPI, Header, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -11,7 +13,15 @@ from .schemas import *  # noqa: F403
 from .services import *  # noqa: F403
 
 settings = get_settings()
-app = FastAPI(title="CAT Guardian API", version="0.1.0")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    Base.metadata.create_all(bind=engine)
+    yield
+
+
+app = FastAPI(title="CAT Guardian API", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -20,11 +30,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-@app.on_event("startup")
-def startup() -> None:
-    Base.metadata.create_all(bind=engine)
 
 
 def current_user(authorization: str = Header(default=""), db: Session = Depends(get_db)) -> User:
@@ -100,6 +105,11 @@ def admin_assign(task_id: int, operator_id: int, machine_id: int, user: User = D
     return {"id": assignment.id, "task_id": assignment.task_id, "operator_id": assignment.operator_id, "machine_id": assignment.machine_id, "assignment_reason": assignment.assignment_reason}
 
 
+@app.get("/admin/safety-events")
+def admin_safety_events(user: User = Depends(require_role("ADMIN")), db: Session = Depends(get_db)):
+    return list_safety_events(db)
+
+
 @app.get("/tasks")
 def list_tasks(user: User = Depends(current_user), db: Session = Depends(get_db)):
     tasks = db.query(Task).order_by(Task.scheduled_at.asc()).all()
@@ -127,6 +137,11 @@ def task_start(task_id: int, user: User = Depends(current_user), db: Session = D
 @app.post("/telemetry/next-tick")
 def telemetry_next_tick(user: User = Depends(current_user), db: Session = Depends(get_db)):
     return advance_telemetry(db)
+
+
+@app.post("/telemetry/toggle-seatbelt")
+def telemetry_toggle_seatbelt(user: User = Depends(current_user), db: Session = Depends(get_db)):
+    return toggle_seatbelt(db)
 
 
 @app.get("/machines/{machine_id}/telemetry")

@@ -1,0 +1,18 @@
+{
+  "model_version": "RandomForestClassifier-v1.1",
+  "algorithm": "RandomForestClassifier",
+  "features": [
+    "idle_time",
+    "baseline_idle",
+    "idle_ratio",
+    "engine_load",
+    "fuel_used",
+    "load_cycles"
+  ],
+  "metrics": {
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1": 1.0
+  },
+  "trained_samples": 2000
+}

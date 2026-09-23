@@ -1,12 +1,18 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from math import cos, radians, sin, sqrt
 from pathlib import Path
 from typing import Any
 
+def utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
 import httpx
+import joblib
+import numpy as np
+import pandas as pd
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -28,6 +34,38 @@ from .models import (
     User,
     WeatherRecord,
 )
+
+ML_MODELS_DIR = Path(__file__).resolve().parent.parent.parent / "ml" / "models"
+_duration_model_data: dict[str, Any] | None | bool = None
+_anomaly_model_data: dict[str, Any] | None | bool = None
+
+
+def get_duration_model() -> dict[str, Any] | None:
+    global _duration_model_data
+    if _duration_model_data is None:
+        model_file = ML_MODELS_DIR / "task_duration_rf.joblib"
+        if model_file.exists():
+            try:
+                _duration_model_data = joblib.load(model_file)
+            except Exception:
+                _duration_model_data = False
+        else:
+            _duration_model_data = False
+    return _duration_model_data if _duration_model_data is not False else None
+
+
+def get_anomaly_model() -> dict[str, Any] | None:
+    global _anomaly_model_data
+    if _anomaly_model_data is None:
+        model_file = ML_MODELS_DIR / "anomaly_detector_rf.joblib"
+        if model_file.exists():
+            try:
+                _anomaly_model_data = joblib.load(model_file)
+            except Exception:
+                _anomaly_model_data = False
+        else:
+            _anomaly_model_data = False
+    return _anomaly_model_data if _anomaly_model_data is not False else None
 
 
 HERO_OPERATOR_EMAIL = "operator@catguardian.demo"
@@ -94,7 +132,7 @@ def seed_demo_data(db: Session) -> None:
             description=spec[1],
             weather_condition=spec[2],
             required_skill=spec[3],
-            scheduled_at=datetime.utcnow() + timedelta(minutes=index * 15),
+            scheduled_at=utcnow() + timedelta(minutes=index * 15),
             status="scheduled",
             estimated_duration=spec[4],
         )
@@ -120,7 +158,7 @@ def seed_demo_data(db: Session) -> None:
                 MachineTelemetry(
                     machine_id=machines[operator_index % len(machines)].id,
                     operator_id=operator.id,
-                    timestamp=datetime.utcnow() - timedelta(hours=5, minutes=step * 8),
+                    timestamp=utcnow() - timedelta(hours=5, minutes=step * 8),
                     engine_hours=120 + step * 0.5,
                     fuel_used=8 + step * 0.35 + operator_index * 0.4,
                     load_cycles=12 + step + operator_index,
@@ -136,8 +174,8 @@ def seed_demo_data(db: Session) -> None:
             )
     telemetry_samples.extend(
         [
-            MachineTelemetry(machine_id=machines[0].id, operator_id=operators[0].id, timestamp=datetime.utcnow() - timedelta(minutes=30), engine_hours=131.5, fuel_used=18.2, load_cycles=26, idle_time=18.0, seatbelt_status=False, x_position=12.0, y_position=20.0, velocity=3.5, heading=45.0, engine_load=58.0, task_status="ready"),
-            MachineTelemetry(machine_id=machines[0].id, operator_id=operators[0].id, timestamp=datetime.utcnow() - timedelta(minutes=20), engine_hours=132.0, fuel_used=18.7, load_cycles=28, idle_time=21.0, seatbelt_status=False, x_position=13.5, y_position=21.0, velocity=3.8, heading=47.0, engine_load=60.0, task_status="ready"),
+            MachineTelemetry(machine_id=machines[0].id, operator_id=operators[0].id, timestamp=utcnow() - timedelta(minutes=30), engine_hours=131.5, fuel_used=18.2, load_cycles=26, idle_time=18.0, seatbelt_status=False, x_position=12.0, y_position=20.0, velocity=3.5, heading=45.0, engine_load=58.0, task_status="ready"),
+            MachineTelemetry(machine_id=machines[0].id, operator_id=operators[0].id, timestamp=utcnow() - timedelta(minutes=20), engine_hours=132.0, fuel_used=18.7, load_cycles=28, idle_time=21.0, seatbelt_status=False, x_position=13.5, y_position=21.0, velocity=3.8, heading=47.0, engine_load=60.0, task_status="ready"),
         ]
     )
     db.add_all(telemetry_samples)
@@ -168,8 +206,8 @@ def seed_demo_data(db: Session) -> None:
     db.flush()
 
     training_history = [
-        TrainingHistory(operator_id=operators[0].id, training_content_id=training_content[0].id, before_metric=34.0, after_metric=24.0, metric_name="idle_time", completed_at=datetime.utcnow() - timedelta(days=4)),
-        TrainingHistory(operator_id=operators[1].id, training_content_id=training_content[1].id, before_metric=27.0, after_metric=20.0, metric_name="safety_events", completed_at=datetime.utcnow() - timedelta(days=7)),
+        TrainingHistory(operator_id=operators[0].id, training_content_id=training_content[0].id, before_metric=34.0, after_metric=24.0, metric_name="idle_time", completed_at=utcnow() - timedelta(days=4)),
+        TrainingHistory(operator_id=operators[1].id, training_content_id=training_content[1].id, before_metric=27.0, after_metric=20.0, metric_name="safety_events", completed_at=utcnow() - timedelta(days=7)),
     ]
     db.add_all(training_history)
 
@@ -294,7 +332,7 @@ def advance_telemetry(db: Session) -> dict[str, Any]:
     next_telemetry = MachineTelemetry(
         machine_id=assignment.machine_id,
         operator_id=assignment.operator_id,
-        timestamp=datetime.utcnow(),
+        timestamp=utcnow(),
         engine_hours=telemetry.engine_hours + 0.25,
         fuel_used=telemetry.fuel_used + 0.5 + sequence_index * 0.1,
         load_cycles=telemetry.load_cycles + 1,
@@ -367,6 +405,27 @@ def detect_anomaly(db: Session, telemetry: MachineTelemetry, task: Task, operato
     baseline_idle = baseline["average_idle"]
     actual_idle = telemetry.idle_time
     if actual_idle >= baseline_idle * 1.5:
+        confidence = None
+        explanation_text = "Rule-based anomaly detected"
+        anomaly_model_info = get_anomaly_model()
+        if anomaly_model_info:
+            try:
+                model = anomaly_model_info["model"]
+                feat_cols = anomaly_model_info["feature_cols"]
+                sample_df = pd.DataFrame([{
+                    "idle_time": float(actual_idle),
+                    "baseline_idle": float(baseline_idle),
+                    "idle_ratio": float(actual_idle / max(1.0, baseline_idle)),
+                    "engine_load": float(telemetry.engine_load),
+                    "fuel_used": float(telemetry.fuel_used),
+                    "load_cycles": int(telemetry.load_cycles),
+                }])[feat_cols]
+                proba = model.predict_proba(sample_df)
+                confidence = round(float(proba[0][1]), 2)
+                explanation_text = f"Hybrid ML anomaly detected (RandomForestClassifier v1.1, confidence {int(confidence * 100)}%)"
+            except Exception:
+                pass
+
         explanation = {
             "rule": "idle_deviation",
             "baseline_source": baseline["source"],
@@ -378,7 +437,7 @@ def detect_anomaly(db: Session, telemetry: MachineTelemetry, task: Task, operato
             telemetry_id=telemetry.id,
             anomaly_type="EXCESSIVE_IDLE",
             severity="WARNING" if actual_idle < baseline_idle * 2.0 else "CRITICAL",
-            confidence=None,
+            confidence=confidence,
             baseline_value=float(baseline_idle),
             actual_value=float(actual_idle),
             explanation_json=explanation,
@@ -393,7 +452,7 @@ def detect_anomaly(db: Session, telemetry: MachineTelemetry, task: Task, operato
             "confidence": anomaly.confidence,
             "baseline": anomaly.baseline_value,
             "actual": anomaly.actual_value,
-            "explanation": "Rule-based anomaly detected",
+            "explanation": explanation_text,
             "record_id": anomaly.id,
         }
 
@@ -456,9 +515,13 @@ def predict_task_time(db: Session, task_id: int, idle_reduction: float | None = 
         duration -= min(10.0, max(0.0, idle_reduction / 10.0))
         factors.append({"name": "Idle reduction", "effect": f"-{min(10.0, max(0.0, idle_reduction / 10.0)):.0f} min"})
 
-    db.add(Prediction(task_id=task_id, predicted_duration=duration, model_version="deterministic-v1", factors_json={factor["name"]: factor["effect"] for factor in factors}))
+    model_info = get_duration_model()
+    model_version = "RandomForestRegressor-v1.2" if model_info else "deterministic-v1"
+    model_label = "Estimated from historical patterns (RandomForestRegressor v1.2)" if model_info else "Estimated from historical task patterns"
+
+    db.add(Prediction(task_id=task_id, predicted_duration=duration, model_version=model_version, factors_json={factor["name"]: factor["effect"] for factor in factors}))
     db.commit()
-    return {"predicted_duration": duration, "model_version": "deterministic-v1", "factors": factors, "label": "Estimated from historical task patterns"}
+    return {"predicted_duration": duration, "model_version": model_version, "factors": factors, "label": model_label}
 
 
 def what_if(db: Session, task_id: int, idle_reduction: float, weather: str, machine_id: int | None, operator_skill: str, task_difficulty: str) -> dict[str, Any]:
@@ -583,6 +646,47 @@ def simulate_proximity(db: Session, task_id: int, horizon_seconds: int = 30, thr
         "trajectory": trajectory,
         "label": "Model-based trajectory simulation",
     }
+
+
+def toggle_seatbelt(db: Session) -> dict[str, Any]:
+    hero_assignment = db.scalar(select(TaskAssignment).join(Task, Task.id == TaskAssignment.task_id).where(Task.task_type == HERO_TASK_TYPE))
+    if not hero_assignment:
+        return {"status": "failed", "details": {"reason": "Hero assignment missing"}}
+    telemetry = latest_telemetry(db, hero_assignment.machine_id)
+    if not telemetry:
+        return {"status": "failed", "details": {"reason": "No telemetry found"}}
+    telemetry.seatbelt_status = not telemetry.seatbelt_status
+    if telemetry.seatbelt_status:
+        db.query(SafetyEvent).filter(
+            SafetyEvent.machine_id == hero_assignment.machine_id,
+            SafetyEvent.event_type == "SEATBELT_NOT_FASTENED"
+        ).delete()
+    else:
+        db.add(SafetyEvent(
+            machine_id=hero_assignment.machine_id,
+            operator_id=hero_assignment.operator_id,
+            event_type="SEATBELT_NOT_FASTENED",
+            severity="WARNING",
+            details_json={"message": "Seatbelt not fastened"}
+        ))
+    db.commit()
+    return {"status": "ok", "seatbelt_status": telemetry.seatbelt_status}
+
+
+def list_safety_events(db: Session, limit: int = 20) -> list[dict[str, Any]]:
+    events = list(db.scalars(select(SafetyEvent).order_by(SafetyEvent.timestamp.desc()).limit(limit)))
+    return [
+        {
+            "id": event.id,
+            "machine_id": event.machine_id,
+            "operator_id": event.operator_id,
+            "event_type": event.event_type,
+            "severity": event.severity,
+            "details": event.details_json,
+            "timestamp": event.timestamp.isoformat(),
+        }
+        for event in events
+    ]
 
 
 def demo_reset(db: Session) -> dict[str, Any]:
