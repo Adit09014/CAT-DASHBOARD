@@ -65,6 +65,9 @@ def test_operator_dashboard_contains_context():
     body = response.json()
     assert body["current_machine"]["machine_code"] == "EXC-001"
     assert "training_recommendation" in body
+    assert "weather" in body
+    assert "daily" in body["weather"]
+    assert "advisories" in body["weather"]
 
 
 def test_prediction_endpoint_returns_factors():

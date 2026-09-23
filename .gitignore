@@ -9,6 +9,8 @@ backend/.venv/
 backend/.mypy_cache/
 backend/*.db
 backend/*.sqlite3
+*.db
+*.sqlite3
 .env
 .DS_Store
 *.pyc

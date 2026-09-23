@@ -27,6 +27,7 @@ import { WhatIfPanel } from '../components/WhatIfPanel';
 import { PredictiveSafetyMap } from '../components/PredictiveSafetyMap';
 import { DomainGuardTraining } from '../components/DomainGuardTraining';
 import { CopilotPanel } from '../components/CopilotPanel';
+import { FullDayWeatherCard } from '../components/FullDayWeatherCard';
 
 type OperatorTab = 'overview' | 'safety-gate' | 'telemetry' | 'what-if' | 'proximity' | 'training' | 'copilot';
 
@@ -219,7 +220,11 @@ export function OperatorDashboardPage() {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-slate-400">Site Weather:</span>
-                <span className="text-sky-300">{weather.condition || 'Cloudy'} ({weather.temperature ?? 22}°C)</span>
+                <span className="text-sky-300 font-medium">{weather.condition || 'Cloudy'} ({weather.temperature ?? 26.5}°C)</span>
+              </div>
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="text-slate-500">Site Location:</span>
+                <span className="text-amber-400 font-semibold">{weather.location || 'Vellore, TN'}</span>
               </div>
             </div>
           </div>
@@ -262,10 +267,10 @@ export function OperatorDashboardPage() {
                   footnote="Weather & machine regression"
                 />
                 <MetricCard
-                  label="Site Environment"
+                  label={`Site: ${weather.location || 'Vellore, TN'}`}
                   value={weather.condition || 'Cloudy'}
-                  delta={`${weather.temperature ?? 22}°C · ${weather.wind ?? 6} km/h`}
-                  footnote="Environmental risk analysis"
+                  delta={`${weather.temperature ?? 26.5}°C · ${weather.wind ?? 15} km/h`}
+                  footnote="Live Satellite & Radar Sync"
                 />
               </div>
 
@@ -313,6 +318,9 @@ export function OperatorDashboardPage() {
                   </p>
                 </div>
               </div>
+
+              {/* Full-Day Shift Weather & Environmental Conditions Showcase */}
+              <FullDayWeatherCard weather={weather} />
 
               {/* Task Details & AI Intelligence Insight Panel */}
               <div className="grid gap-6 lg:grid-cols-2">

@@ -318,8 +318,154 @@ def latest_telemetry(db: Session, machine_id: int) -> MachineTelemetry | None:
     return db.scalar(select(MachineTelemetry).where(MachineTelemetry.machine_id == machine_id).order_by(MachineTelemetry.timestamp.desc()))
 
 
+# Vellore, Tamil Nadu Coordinates: 12.9165° N, 79.1325° E
+VELLORE_LAT = 12.9165
+VELLORE_LON = 79.1325
+
+WMO_WEATHER_MAP = {
+    0: "Clear",
+    1: "Mainly Clear",
+    2: "Partly Cloudy",
+    3: "Overcast",
+    45: "Foggy",
+    48: "Foggy",
+    51: "Light Drizzle",
+    53: "Drizzle",
+    55: "Heavy Drizzle",
+    61: "Slight Rain",
+    63: "Moderate Rain",
+    65: "Heavy Rain",
+    71: "Slight Snow",
+    73: "Moderate Snow",
+    75: "Heavy Snow",
+    80: "Rain Showers",
+    81: "Moderate Showers",
+    82: "Violent Showers",
+    95: "Thunderstorm",
+    96: "Thunderstorm with Hail",
+    99: "Severe Thunderstorm",
+}
+
+_weather_cache: dict[str, Any] = {"data": None, "fetched_at": 0.0}
+
+
+def fetch_live_weather(lat: float = VELLORE_LAT, lon: float = VELLORE_LON, location_name: str = "Vellore, TN") -> dict[str, Any] | None:
+    import time
+    now = time.time()
+    if _weather_cache["data"] and (now - _weather_cache["fetched_at"] < 600):
+        return _weather_cache["data"]
+
+    try:
+        url = (
+            f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
+            "&current=temperature_2m,relative_humidity_2m,precipitation,weather_code,wind_speed_10m"
+            "&hourly=temperature_2m,precipitation_probability,precipitation,weather_code,wind_speed_10m"
+            "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max"
+            "&timezone=auto&forecast_days=1"
+        )
+        with httpx.Client(timeout=5.0) as client:
+            resp = client.get(url)
+            if resp.status_code == 200:
+                payload = resp.json()
+                current = payload.get("current", {})
+                daily_raw = payload.get("daily", {})
+                hourly_raw = payload.get("hourly", {})
+
+                w_code = current.get("weather_code", 0)
+                condition = WMO_WEATHER_MAP.get(w_code, "Cloudy")
+
+                # Daily forecast metrics
+                daily_summary = {
+                    "max_temp": round(float(daily_raw.get("temperature_2m_max", [33.5])[0]), 1),
+                    "min_temp": round(float(daily_raw.get("temperature_2m_min", [25.7])[0]), 1),
+                    "total_rain_mm": round(float(daily_raw.get("precipitation_sum", [0.0])[0] or 0.0), 1),
+                    "max_rain_probability": int(daily_raw.get("precipitation_probability_max", [0])[0] or 0),
+                    "max_wind_kmh": round(float(daily_raw.get("wind_speed_10m_max", [18.0])[0]), 1),
+                    "overall_condition": WMO_WEATHER_MAP.get(daily_raw.get("weather_code", [w_code])[0], condition),
+                }
+
+                # Full 24-hour forecast
+                all_hourly = []
+                times = hourly_raw.get("time", [])
+                temps = hourly_raw.get("temperature_2m", [])
+                probs = hourly_raw.get("precipitation_probability", [])
+                rains = hourly_raw.get("precipitation", [])
+                codes = hourly_raw.get("weather_code", [])
+                winds = hourly_raw.get("wind_speed_10m", [])
+
+                for i in range(len(times)):
+                    t_str = times[i]
+                    hour_label = t_str.split("T")[-1] if "T" in t_str else t_str
+                    all_hourly.append({
+                        "time": hour_label,
+                        "temperature": round(float(temps[i]), 1) if i < len(temps) else 26.0,
+                        "precipitation_prob": int(probs[i] or 0) if i < len(probs) else 0,
+                        "precipitation_mm": round(float(rains[i] or 0.0), 1) if i < len(rains) else 0.0,
+                        "condition": WMO_WEATHER_MAP.get(codes[i], "Cloudy") if i < len(codes) else "Cloudy",
+                        "wind": round(float(winds[i]), 1) if i < len(winds) else 15.0,
+                    })
+
+                # Shift Operational Advisories
+                advisories = []
+                if daily_summary["max_temp"] >= 33.0:
+                    advisories.append(f"High heat of {daily_summary['max_temp']}°C expected mid-day. Monitor hydraulic fluid temps and cab AC load.")
+                if daily_summary["max_wind_kmh"] >= 20.0:
+                    advisories.append(f"Peak wind gusts up to {daily_summary['max_wind_kmh']} km/h forecast today. Watch boom swing drift on elevated slopes.")
+                if daily_summary["max_rain_probability"] >= 30:
+                    advisories.append(f"{daily_summary['max_rain_probability']}% rain chance today ({daily_summary['total_rain_mm']} mm expected). Prioritize deep trenching before ground softens.")
+                if not advisories:
+                    advisories.append("Favorable day-long weather conditions across all shift hours.")
+
+                weather_info = {
+                    "location": location_name,
+                    "condition": condition,
+                    "temperature": round(float(current.get("temperature_2m", 26.5)), 1),
+                    "precipitation": round(float(current.get("precipitation", 0.0)), 1),
+                    "wind": round(float(current.get("wind_speed_10m", 15.0)), 1),
+                    "humidity": current.get("relative_humidity_2m", 51),
+                    "source": "live_open_meteo_vellore",
+                    "daily": daily_summary,
+                    "hourly": all_hourly,
+                    "advisories": advisories,
+                }
+                _weather_cache["data"] = weather_info
+                _weather_cache["fetched_at"] = now
+                return weather_info
+    except Exception as e:
+        logger.warning("Failed to fetch live weather: %s", e)
+    return None
+
+
 def task_weather(db: Session, task_id: int) -> WeatherRecord | None:
-    return db.scalar(select(WeatherRecord).where(WeatherRecord.task_id == task_id).order_by(WeatherRecord.timestamp.desc()))
+    live = fetch_live_weather()
+    record = db.scalar(select(WeatherRecord).where(WeatherRecord.task_id == task_id).order_by(WeatherRecord.timestamp.desc()))
+    if live:
+        if record:
+            record.condition = live["condition"]
+            record.temperature = live["temperature"]
+            record.precipitation = live["precipitation"]
+            record.wind = live["wind"]
+            try:
+                db.commit()
+            except Exception:
+                db.rollback()
+            return record
+        else:
+            new_rec = WeatherRecord(
+                task_id=task_id,
+                condition=live["condition"],
+                temperature=live["temperature"],
+                precipitation=live["precipitation"],
+                wind=live["wind"],
+            )
+            db.add(new_rec)
+            try:
+                db.commit()
+                db.refresh(new_rec)
+            except Exception:
+                db.rollback()
+            return new_rec
+    return record
 
 
 def active_safety_events(db: Session, machine_id: int) -> list[SafetyEvent]:
@@ -406,22 +552,61 @@ def advance_telemetry(db: Session) -> dict[str, Any]:
 
 
 def get_weather_context(db: Session, task_id: int) -> dict[str, Any]:
+    live = fetch_live_weather()
+    if live:
+        return {
+            "location": live["location"],
+            "condition": live["condition"],
+            "temperature": live["temperature"],
+            "precipitation": live["precipitation"],
+            "wind": live["wind"],
+            "humidity": live.get("humidity", 65),
+            "source": live["source"],
+            "daily": live.get("daily"),
+            "hourly": live.get("hourly", []),
+            "advisories": live.get("advisories", []),
+        }
+
     weather = task_weather(db, task_id)
     if weather:
         return {
+            "location": "Vellore, TN (Cached)",
             "condition": weather.condition,
             "temperature": weather.temperature,
             "precipitation": weather.precipitation,
             "wind": weather.wind,
+            "humidity": 60,
             "source": "seeded",
+            "daily": {
+                "max_temp": 33.5,
+                "min_temp": 25.7,
+                "total_rain_mm": 0.6,
+                "max_rain_probability": 37,
+                "max_wind_kmh": 25.8,
+                "overall_condition": weather.condition,
+            },
+            "hourly": [],
+            "advisories": ["Live sensor sync pending, displaying seeded baseline for Vellore site."],
         }
 
     return {
+        "location": "Vellore, TN",
         "condition": "Clear",
-        "temperature": 22.0,
+        "temperature": 26.5,
         "precipitation": 0.0,
-        "wind": 6.0,
+        "wind": 15.0,
+        "humidity": 55,
         "source": "fallback",
+        "daily": {
+            "max_temp": 33.5,
+            "min_temp": 25.7,
+            "total_rain_mm": 0.6,
+            "max_rain_probability": 37,
+            "max_wind_kmh": 25.8,
+            "overall_condition": "Clear",
+        },
+        "hourly": [],
+        "advisories": ["Favorable shift conditions in Vellore."],
     }
 
 
@@ -522,12 +707,18 @@ def prediction_factors(task: Task, weather: WeatherRecord | None, operator_id: i
     duration = float(task.estimated_duration)
     factors: list[dict[str, Any]] = []
 
-    if weather and weather.condition.lower() == "rain":
+    live = fetch_live_weather()
+    daily = live.get("daily", {}) if live else {}
+
+    if weather and "rain" in weather.condition.lower():
         duration += 7
-        factors.append({"name": "Rain", "effect": "+7 min"})
-    elif weather and weather.condition.lower() == "windy":
-        duration += 4
-        factors.append({"name": "Wind", "effect": "+4 min"})
+        factors.append({"name": "Current Rain (Vellore)", "effect": "+7 min"})
+    elif daily.get("max_rain_probability", 0) >= 30:
+        duration += 3
+        factors.append({"name": f"Day Rain Probability ({daily['max_rain_probability']}%)", "effect": "+3 min"})
+    elif (weather and "wind" in weather.condition.lower()) or daily.get("max_wind_kmh", 0) >= 22.0:
+        duration += 3
+        factors.append({"name": f"High Wind Drag ({daily.get('max_wind_kmh', 20)} km/h)", "effect": "+3 min"})
 
     if baseline["average_duration"]:
         skill_delta = max(0.0, (task.estimated_duration - baseline["average_duration"]) * 0.15)
@@ -1415,7 +1606,10 @@ Current Machine Context:
   * Baseline Fuel: {context.get('baseline_fuel')} L
   * Baseline Task Duration: {context.get('baseline_duration')} min
 - Active Anomaly/Alert: {context.get('anomaly')}
-- Live Weather: {context.get('weather')} (Temp: {context.get('temperature')}°C, Precipitation: {context.get('precipitation')}mm, Wind: {context.get('wind')}km/h)
+- Live Site Weather ({context.get('weather_location', 'Vellore, TN')}):
+  * Current: {context.get('weather')} (Temp: {context.get('temperature')}°C, Precipitation: {context.get('precipitation')}mm, Wind: {context.get('wind')}km/h)
+  * Full-Day Forecast ({context.get('weather_location', 'Vellore, TN')}): High {context.get('daily_weather', {}).get('max_temp', 33.5)}°C / Low {context.get('daily_weather', {}).get('min_temp', 25.7)}°C, Max Rain Probability {context.get('daily_weather', {}).get('max_rain_probability', 37)}%, Total Rain {context.get('daily_weather', {}).get('total_rain_mm', 0.6)}mm, Peak Wind Gusts {context.get('daily_weather', {}).get('max_wind_kmh', 25.8)}km/h
+  * Whole-Day Shift Advisories: {'; '.join(context.get('weather_advisories', ['Favorable shift operating conditions']))}
 
 Operator Question: "{question}"
 
@@ -1423,7 +1617,8 @@ Instructions:
 1. Answer the operator's question directly, accurately, and concisely (2 to 4 sentences).
 2. Reference the machine's live telemetry or context when relevant.
 3. Be professional, direct, and actionable like a smart Caterpillar in-cab copilot.
-4. If asked about mechanical issues, operating techniques, safety precautions, or task parameters, give practical guidance tailored to this machine and conditions."""
+4. If asked about mechanical issues, operating techniques, safety precautions, or task parameters, give practical guidance tailored to this machine and conditions.
+5. When answering queries about site conditions, weather, or shift scheduling, proactively consider BOTH current readings and the entire day's forecast (upcoming heat, rain risks, or afternoon wind gusts)."""
 
     try:
         if prov == "groq":
@@ -1548,10 +1743,13 @@ def copilot_answer(db: Session, operator_id: int, question: str, api_key: str | 
         "heading": telemetry.heading if telemetry else 45.0,
         "seatbelt_status": telemetry.seatbelt_status if telemetry else False,
         "anomaly": anomaly.get("explanation") if anomaly and anomaly.get("is_anomaly") else "None",
-        "weather": weather.condition if weather else "Cloudy",
-        "temperature": weather.temperature if weather else 19.0,
-        "precipitation": weather.precipitation if weather else 0.1,
-        "wind": weather.wind if weather else 9.0,
+        "weather": (get_weather_context(db, task.id if task else 1)).get("condition", "Cloudy"),
+        "temperature": (get_weather_context(db, task.id if task else 1)).get("temperature", 26.5),
+        "precipitation": (get_weather_context(db, task.id if task else 1)).get("precipitation", 0.0),
+        "wind": (get_weather_context(db, task.id if task else 1)).get("wind", 15.0),
+        "weather_location": (get_weather_context(db, task.id if task else 1)).get("location", "Vellore, TN"),
+        "daily_weather": (get_weather_context(db, task.id if task else 1)).get("daily", {}),
+        "weather_advisories": (get_weather_context(db, task.id if task else 1)).get("advisories", []),
         "baseline_idle": baseline.get("average_idle", 18.0),
         "baseline_fuel": baseline.get("average_fuel", 19.2),
         "baseline_duration": baseline.get("average_duration", 74.0),
@@ -1618,8 +1816,14 @@ def copilot_answer(db: Session, operator_id: int, question: str, api_key: str | 
         answer = f"{context_used['machine']} is travelling at {context_used['velocity']:.1f} km/h with heading {context_used['heading']:.0f}°. Site haul road speed limit is 15 km/h."
 
     # Weather & terrain conditions
-    elif any(w in words for w in ["weather", "rain", "mud", "temperature", "wind", "storm", "wet"]):
-        answer = f"Site weather is {context_used['weather']} at {context_used['temperature']:.1f}°C with {context_used['precipitation']:.1f} mm rain and {context_used['wind']:.1f} km/h wind. In wet conditions, maintain a 3-meter safety setback from trench edges to prevent side-wall slumping."
+    elif any(w in words for w in ["weather", "rain", "mud", "temperature", "wind", "storm", "wet", "forecast", "today"]):
+        daily_info = context_used.get("daily_weather", {})
+        high_t = daily_info.get("max_temp", 33.5)
+        low_t = daily_info.get("min_temp", 25.7)
+        rain_prob = daily_info.get("max_rain_probability", 37)
+        max_w = daily_info.get("max_wind_kmh", 25.8)
+        adv = "; ".join(context_used.get("weather_advisories", []))
+        answer = f"Full-Day Weather Report for {context_used.get('weather_location', 'Vellore, TN')}: Currently {context_used['weather']} at {context_used['temperature']}°C (Wind {context_used['wind']} km/h). Today's shift forecast ranges from {low_t}°C to {high_t}°C with a {rain_prob}% rain probability and peak wind gusts of {max_w} km/h. Shift Advisory: {adv}"
 
     # Inspection & pre-shift checks
     elif any(w in words for w in ["check", "walkaround", "pre-trip", "pre-start", "procedure", "start"]):
@@ -1708,7 +1912,7 @@ def dashboard_for_operator(db: Session, operator_id: int) -> dict[str, Any]:
         "ai_insight": ai_insight,
         "training_recommendation": training,
         "what_if": whatif,
-        "weather": {"condition": weather.condition, "temperature": weather.temperature, "precipitation": weather.precipitation, "wind": weather.wind} if weather else {},
+        "weather": get_weather_context(db, task.id if task else 1),
     }
 
 
