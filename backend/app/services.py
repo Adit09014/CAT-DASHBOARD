@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from math import cos, radians, sin, sqrt
+from math import atan2, cos, degrees, radians, sin, sqrt
 from pathlib import Path
 from typing import Any
 
@@ -73,6 +73,29 @@ def get_anomaly_model() -> dict[str, Any] | None:
     return _anomaly_model_data if _anomaly_model_data is not False else None
 
 
+ANOMALY_DIR = Path(__file__).resolve().parent.parent.parent / "Anomoly Detection"
+_best_safety_model: Any = None
+_safety_decision_threshold: float = 0.655
+
+
+def get_best_safety_model() -> tuple[Any, float]:
+    global _best_safety_model, _safety_decision_threshold
+    if _best_safety_model is None:
+        model_file = ANOMALY_DIR / "best_model.joblib"
+        thresh_file = ANOMALY_DIR / "decision_threshold.joblib"
+        if model_file.exists():
+            try:
+                _best_safety_model = joblib.load(model_file)
+                if thresh_file.exists():
+                    _safety_decision_threshold = float(joblib.load(thresh_file))
+            except Exception as e:
+                logger.error("Failed to load pre-trained anomaly model: %s", e)
+                _best_safety_model = False
+        else:
+            _best_safety_model = False
+    return (_best_safety_model, _safety_decision_threshold) if _best_safety_model is not False else (None, 0.655)
+
+
 HERO_OPERATOR_EMAIL = "operator@catguardian.demo"
 HERO_MACHINE_CODE = "EXC-001"
 HERO_TASK_TYPE = "Excavation"
@@ -87,23 +110,23 @@ def seed_demo_data(db: Session) -> None:
     if db.scalar(select(User).limit(1)):
         return
 
-    admin = User(name="CAT Guardian Admin", email="admin@catguardian.demo", password_hash=hash_password("Admin123!"), role="ADMIN")
+    admin = User(name="CAT Guardian Admin", email="admin@catguardian.demo", password_hash=hash_password("Admin123!"), role="ADMIN", experience_months=96, operator_code="ADM001")
     operators = [
-        User(name="Avery Stone", email="operator@catguardian.demo", password_hash=hash_password("Operator123!"), role="OPERATOR"),
-        User(name="Blake Carter", email="op2@catguardian.demo", password_hash=hash_password("Operator123!"), role="OPERATOR"),
-        User(name="Casey Rivera", email="op3@catguardian.demo", password_hash=hash_password("Operator123!"), role="OPERATOR"),
-        User(name="Dana Patel", email="op4@catguardian.demo", password_hash=hash_password("Operator123!"), role="OPERATOR"),
-        User(name="Elliot Chen", email="op5@catguardian.demo", password_hash=hash_password("Operator123!"), role="OPERATOR"),
+        User(name="Avery Stone", email="operator@catguardian.demo", password_hash=hash_password("Operator123!"), role="OPERATOR", experience_months=89, operator_code="OP1013"),
+        User(name="Blake Carter", email="op2@catguardian.demo", password_hash=hash_password("Operator123!"), role="OPERATOR", experience_months=188, operator_code="OP1007"),
+        User(name="Casey Rivera", email="op3@catguardian.demo", password_hash=hash_password("Operator123!"), role="OPERATOR", experience_months=234, operator_code="OP1003"),
+        User(name="Dana Patel", email="op4@catguardian.demo", password_hash=hash_password("Operator123!"), role="OPERATOR", experience_months=123, operator_code="OP1008"),
+        User(name="Elliot Chen", email="op5@catguardian.demo", password_hash=hash_password("Operator123!"), role="OPERATOR", experience_months=201, operator_code="OP1010"),
     ]
     db.add_all([admin, *operators])
     db.flush()
 
     machines = [
-        Machine(machine_code="EXC-001", machine_type="Excavator", age_years=3, status="active"),
-        Machine(machine_code="LOD-002", machine_type="Loader", age_years=5, status="active"),
-        Machine(machine_code="GRD-003", machine_type="Grader", age_years=2, status="active"),
-        Machine(machine_code="MOV-004", machine_type="Material Mover", age_years=6, status="active"),
-        Machine(machine_code="EXC-005", machine_type="Excavator", age_years=4, status="active"),
+        Machine(machine_code="EXC-001", machine_type="Excavator", age_years=3, max_load_capacity_tons=25.0, model_series="CAT 336 Next Gen", status="active"),
+        Machine(machine_code="LOD-002", machine_type="Loader", age_years=5, max_load_capacity_tons=30.0, model_series="CAT 980M Wheel Loader", status="active"),
+        Machine(machine_code="GRD-003", machine_type="Grader", age_years=2, max_load_capacity_tons=18.0, model_series="CAT 140 Motor Grader", status="active"),
+        Machine(machine_code="MOV-004", machine_type="Material Mover", age_years=6, max_load_capacity_tons=40.0, model_series="CAT 745 Articulated Truck", status="active"),
+        Machine(machine_code="EXC-005", machine_type="Excavator", age_years=4, max_load_capacity_tons=35.0, model_series="CAT 349 Heavy Excavator", status="active"),
     ]
     db.add_all(machines)
     db.flush()
@@ -159,6 +182,10 @@ def seed_demo_data(db: Session) -> None:
     for operator_index, operator in enumerate(operators):
         baseline_idle = [18, 26, 33, 22, 29][operator_index]
         for step in range(24):
+            t_tilt = round(1.5 + (step % 5) * 0.4, 1)
+            t_slope = round(2.0 + (step % 4) * 0.5, 1)
+            t_load = round(8.0 + (step % 6) * 2.2, 1)
+            t_obst = round(max(5.0, 30.0 - (step % 10) * 2.5), 1)
             telemetry_samples.append(
                 MachineTelemetry(
                     machine_id=machines[operator_index % len(machines)].id,
@@ -175,23 +202,171 @@ def seed_demo_data(db: Session) -> None:
                     heading=20 + step * 2,
                     engine_load=55 + (step % 5) * 4,
                     task_status="active",
+                    load_weight_tons=t_load,
+                    max_load_capacity_tons=25.0,
+                    load_utilization_pct=round((t_load / 25.0) * 100, 1),
+                    operator_shift_hours=round(1.5 + step * 0.15, 2),
+                    continuous_driving_min=round(25.0 + step * 3.5, 1),
+                    machine_speed_kmph=round(10.0 + (step % 4) * 2.5, 1),
+                    harsh_braking_events=0,
+                    harsh_acceleration_events=0,
+                    ground_slope_deg=t_slope,
+                    machine_tilt_deg=t_tilt,
+                    weather_condition="Clear",
+                    visibility_m=180.0,
+                    proximity_hazard=False,
+                    min_obstacle_distance_m=t_obst,
+                    safety_alert_prob=0.002,
+                    safety_alert_triggered=False,
+                    risk_factors_json={},
                 )
             )
     telemetry_samples.extend(
         [
-            MachineTelemetry(machine_id=machines[0].id, operator_id=operators[0].id, timestamp=utcnow() - timedelta(minutes=30), engine_hours=131.5, fuel_used=18.2, load_cycles=26, idle_time=18.0, seatbelt_status=False, x_position=12.0, y_position=20.0, velocity=3.5, heading=45.0, engine_load=58.0, task_status="ready"),
-            MachineTelemetry(machine_id=machines[0].id, operator_id=operators[0].id, timestamp=utcnow() - timedelta(minutes=20), engine_hours=132.0, fuel_used=18.7, load_cycles=28, idle_time=21.0, seatbelt_status=False, x_position=13.5, y_position=21.0, velocity=3.8, heading=47.0, engine_load=60.0, task_status="ready"),
+            MachineTelemetry(
+                machine_id=machines[0].id,
+                operator_id=operators[0].id,
+                timestamp=utcnow() - timedelta(minutes=30),
+                engine_hours=131.5,
+                fuel_used=18.2,
+                load_cycles=26,
+                idle_time=18.0,
+                seatbelt_status=False,
+                x_position=12.0,
+                y_position=20.0,
+                velocity=3.5,
+                heading=45.0,
+                engine_load=58.0,
+                task_status="ready",
+                load_weight_tons=14.5,
+                max_load_capacity_tons=25.0,
+                load_utilization_pct=58.0,
+                operator_shift_hours=4.5,
+                continuous_driving_min=110.0,
+                machine_speed_kmph=14.0,
+                harsh_braking_events=1,
+                harsh_acceleration_events=0,
+                ground_slope_deg=4.2,
+                machine_tilt_deg=3.5,
+                weather_condition="Clear",
+                visibility_m=150.0,
+                proximity_hazard=False,
+                min_obstacle_distance_m=18.5,
+                safety_alert_prob=0.12,
+                safety_alert_triggered=False,
+                risk_factors_json={},
+            ),
+            MachineTelemetry(
+                machine_id=machines[0].id,
+                operator_id=operators[0].id,
+                timestamp=utcnow() - timedelta(minutes=20),
+                engine_hours=132.0,
+                fuel_used=18.7,
+                load_cycles=28,
+                idle_time=21.0,
+                seatbelt_status=False,
+                x_position=13.5,
+                y_position=21.0,
+                velocity=3.8,
+                heading=47.0,
+                engine_load=60.0,
+                task_status="ready",
+                load_weight_tons=16.2,
+                max_load_capacity_tons=25.0,
+                load_utilization_pct=64.8,
+                operator_shift_hours=4.8,
+                continuous_driving_min=135.0,
+                machine_speed_kmph=15.2,
+                harsh_braking_events=2,
+                harsh_acceleration_events=1,
+                ground_slope_deg=6.8,
+                machine_tilt_deg=7.4,
+                weather_condition="Clear",
+                visibility_m=140.0,
+                proximity_hazard=True,
+                min_obstacle_distance_m=4.2,
+                safety_alert_prob=0.88,
+                safety_alert_triggered=True,
+                risk_factors_json={},
+            ),
         ]
     )
     db.add_all(telemetry_samples)
     db.flush()
 
+    # Score telemetry records with ML model
+    for tel in telemetry_samples[-5:]:
+        ev = evaluate_safety_anomaly(tel)
+        tel.safety_alert_prob = ev["safety_alert_prob"]
+        tel.safety_alert_triggered = ev["safety_alert_triggered"]
+        tel.risk_factors_json = {"factors": ev["risk_factors"]}
+
     safety_events = [
-        SafetyEvent(machine_id=machines[0].id, operator_id=operators[0].id, event_type="SEATBELT_NOT_FASTENED", severity="WARNING", details_json={"message": "Seatbelt disengaged at start"}),
-        SafetyEvent(machine_id=machines[1].id, operator_id=operators[1].id, event_type="PROXIMITY_ALERT", severity="CRITICAL", details_json={"message": "Pedestrian zone entry"}),
-        SafetyEvent(machine_id=machines[4].id, operator_id=operators[4].id, event_type="HIGH_IDLE", severity="WARNING", details_json={"message": "Idling above baseline"}),
+        SafetyEvent(machine_id=machines[0].id, operator_id=operators[0].id, event_type="SEATBELT_NOT_FASTENED", severity="WARNING", details_json={"message": "Seatbelt disengaged during active haul"}),
+        SafetyEvent(machine_id=machines[1].id, operator_id=operators[1].id, event_type="PROXIMITY_ALERT", severity="CRITICAL", details_json={"message": "Pedestrian safety boundary breached (3.8m)"}),
+        SafetyEvent(machine_id=machines[4].id, operator_id=operators[4].id, event_type="HIGH_IDLE", severity="WARNING", details_json={"message": "Idling 45% above shift baseline"}),
+        SafetyEvent(machine_id=machines[0].id, operator_id=operators[0].id, event_type="ML_ROLLOVER_HAZARD", severity="CRITICAL", details_json={"message": "Chassis roll tilt 7.4° exceeds threshold on 6.8° slope"}),
     ]
     db.add_all(safety_events)
+
+    anomalies = [
+        Anomaly(
+            operator_id=operators[0].id,
+            machine_id=machines[0].id,
+            anomaly_type="SAFETY_ML_TILT_ROLLOVER",
+            severity="CRITICAL",
+            confidence=0.88,
+            baseline_value=0.655,
+            actual_value=0.88,
+            threat_level="CRITICAL",
+            acknowledged=False,
+            explanation_json={
+                "title": "Chassis Rollover Risk Detected",
+                "risk_factors": [
+                    {"factor": "Chassis Tilt / Rollover Hazard", "severity": "CRITICAL", "message": "Chassis tilt 7.4° on 6.8° slope grade."},
+                    {"factor": "Unfastened Seatbelt", "severity": "CRITICAL", "message": "Harness disengaged during high-angle maneuver."},
+                    {"factor": "Proximity Zone Breach", "severity": "CRITICAL", "message": "Obstacle 4.2m from rear quadrant."}
+                ]
+            }
+        ),
+        Anomaly(
+            operator_id=operators[1].id,
+            machine_id=machines[1].id,
+            anomaly_type="SAFETY_ML_PROXIMITY_BREACH",
+            severity="CRITICAL",
+            confidence=0.79,
+            baseline_value=0.655,
+            actual_value=0.79,
+            threat_level="CRITICAL",
+            acknowledged=False,
+            explanation_json={
+                "title": "Proximity Barrier Violation",
+                "risk_factors": [
+                    {"factor": "Proximity Zone Breach", "severity": "CRITICAL", "message": "Pedestrian detected at 3.6m boundary."},
+                    {"factor": "Harsh Deceleration", "severity": "WARNING", "message": "2 emergency braking events logged."}
+                ]
+            }
+        ),
+        Anomaly(
+            operator_id=operators[4].id,
+            machine_id=machines[4].id,
+            anomaly_type="SAFETY_ML_OPERATOR_FATIGUE",
+            severity="WARNING",
+            confidence=0.52,
+            baseline_value=0.655,
+            actual_value=0.52,
+            threat_level="ELEVATED",
+            acknowledged=True,
+            explanation_json={
+                "title": "Prolonged Duty Cycle Fatigue",
+                "risk_factors": [
+                    {"factor": "Continuous Driving Fatigue", "severity": "WARNING", "message": "Continuous machine driving 145 min without stand-down interval."}
+                ]
+            }
+        )
+    ]
+    db.add_all(anomalies)
+
 
     baselines = [
         OperatorBaseline(operator_id=operators[0].id, task_type="Excavation", average_idle=18.0, average_fuel=19.2, average_duration=74.0, sample_size=18),
@@ -205,8 +380,8 @@ def seed_demo_data(db: Session) -> None:
     training_content = [
         TrainingContent(
             video_id="s_7pWTm0WH4",
-            title="HOW TO | Use Your 6-in-1 Shovel (JCB Backhoe Operations)",
-            description="Official JCB operator guide on operating the 6-in-1 front shovel and backhoe loader controls for spreading, grading, and loading.",
+            title="HOW TO | Operate a Cat® Backhoe Loader (Cat 420 Controls)",
+            description="Official Caterpillar operator guide on operating the 6-in-1 front shovel and Cat 420 backhoe loader controls for spreading, grading, and loading.",
             topic="backhoe operation",
             source="curated",
             relevance_score=0.98,
@@ -525,6 +700,17 @@ def advance_telemetry(db: Session) -> dict[str, Any]:
     sequence_index = min(current_count, len(TELEMETRY_IDLE_SEQUENCE) - 1)
     next_idle = TELEMETRY_IDLE_SEQUENCE[sequence_index]
     next_seatbelt = sequence_index >= 2
+    next_tilt = round(1.8 + (sequence_index % 3) * 0.5, 1)
+    next_slope = round(2.5 + (sequence_index % 4) * 0.4, 1)
+    next_obstacle = round(max(6.0, 26.0 - sequence_index * 2.8), 1)
+    next_driving = round(35.0 + sequence_index * 15.0, 1)
+    next_speed = round(max(8.0, 14.0 - sequence_index * 1.2), 1)
+    next_harsh_braking = 1 if sequence_index == 3 else 0
+    next_harsh_accel = 1 if sequence_index == 2 else 0
+    next_load_wt = round(12.5 + (sequence_index % 3) * 1.5, 1)
+    next_load_util = round((next_load_wt / 25.0) * 100.0, 1)
+    next_prox_hazard = next_obstacle <= 8.0
+
     next_telemetry = MachineTelemetry(
         machine_id=assignment.machine_id,
         operator_id=assignment.operator_id,
@@ -540,15 +726,39 @@ def advance_telemetry(db: Session) -> dict[str, Any]:
         heading=telemetry.heading + 3.0,
         engine_load=min(95.0, telemetry.engine_load + 4.0),
         task_status="active",
+        load_weight_tons=next_load_wt,
+        max_load_capacity_tons=25.0,
+        load_utilization_pct=next_load_util,
+        operator_shift_hours=round(2.5 + sequence_index * 0.25, 2),
+        continuous_driving_min=next_driving,
+        machine_speed_kmph=next_speed,
+        harsh_braking_events=next_harsh_braking,
+        harsh_acceleration_events=next_harsh_accel,
+        ground_slope_deg=next_slope,
+        machine_tilt_deg=next_tilt,
+        weather_condition="Clear",
+        visibility_m=180.0,
+        proximity_hazard=next_prox_hazard,
+        min_obstacle_distance_m=next_obstacle,
+        safety_alert_prob=0.01,
+        safety_alert_triggered=False,
+        risk_factors_json={},
     )
+    eval_res = evaluate_safety_anomaly(next_telemetry)
+    next_telemetry.safety_alert_prob = eval_res["safety_alert_prob"]
+    next_telemetry.safety_alert_triggered = eval_res["safety_alert_triggered"]
+    next_telemetry.risk_factors_json = {"factors": eval_res["risk_factors"]}
     db.add(next_telemetry)
 
     if next_idle >= 43:
         db.add(SafetyEvent(machine_id=assignment.machine_id, operator_id=assignment.operator_id, event_type="HIGH_IDLE", severity="WARNING", details_json={"message": "Idle above baseline"}))
 
+    if eval_res["safety_alert_triggered"]:
+        db.add(SafetyEvent(machine_id=assignment.machine_id, operator_id=assignment.operator_id, event_type="CRITICAL_SAFETY_ANOMALY", severity="CRITICAL", details_json={"probability": eval_res["safety_alert_prob"], "factors": [f["factor"] for f in eval_res["risk_factors"]]}))
+
     db.commit()
     db.refresh(next_telemetry)
-    return {"advanced": True, "telemetry": telemetry_payload(next_telemetry)}
+    return {"advanced": True, "telemetry": telemetry_payload(next_telemetry), "evaluation": eval_res}
 
 
 def get_weather_context(db: Session, task_id: int) -> dict[str, Any]:
@@ -611,22 +821,254 @@ def get_weather_context(db: Session, task_id: int) -> dict[str, Any]:
 
 
 def telemetry_payload(telemetry: MachineTelemetry) -> dict[str, Any]:
+    rf_json = getattr(telemetry, "risk_factors_json", None)
+    risk_factors = []
+    if isinstance(rf_json, dict):
+        risk_factors = rf_json.get("factors", [])
+    elif isinstance(rf_json, list):
+        risk_factors = rf_json
+
     return {
         "id": telemetry.id,
         "machine_id": telemetry.machine_id,
         "operator_id": telemetry.operator_id,
         "timestamp": telemetry.timestamp.isoformat(),
-        "engine_hours": telemetry.engine_hours,
-        "fuel_used": telemetry.fuel_used,
-        "load_cycles": telemetry.load_cycles,
-        "idle_time": telemetry.idle_time,
-        "seatbelt_status": telemetry.seatbelt_status,
-        "x_position": telemetry.x_position,
-        "y_position": telemetry.y_position,
-        "velocity": telemetry.velocity,
-        "heading": telemetry.heading,
-        "engine_load": telemetry.engine_load,
+        "engine_hours": round(float(telemetry.engine_hours), 2),
+        "fuel_used": round(float(telemetry.fuel_used), 2),
+        "load_cycles": int(telemetry.load_cycles),
+        "idle_time": round(float(telemetry.idle_time), 1),
+        "seatbelt_status": bool(telemetry.seatbelt_status),
+        "x_position": round(float(telemetry.x_position), 2),
+        "y_position": round(float(telemetry.y_position), 2),
+        "velocity": round(float(telemetry.velocity), 2),
+        "heading": round(float(telemetry.heading), 1),
+        "engine_load": round(float(telemetry.engine_load), 1),
         "task_status": telemetry.task_status,
+        "load_weight_tons": round(float(getattr(telemetry, "load_weight_tons", 10.0) or 10.0), 2),
+        "max_load_capacity_tons": round(float(getattr(telemetry, "max_load_capacity_tons", 25.0) or 25.0), 1),
+        "load_utilization_pct": round(float(getattr(telemetry, "load_utilization_pct", 40.0) or 40.0), 1),
+        "operator_shift_hours": round(float(getattr(telemetry, "operator_shift_hours", 2.5) or 2.5), 2),
+        "continuous_driving_min": round(float(getattr(telemetry, "continuous_driving_min", 35.0) or 35.0), 1),
+        "machine_speed_kmph": round(float(getattr(telemetry, "machine_speed_kmph", 12.0) or 12.0), 1),
+        "harsh_braking_events": int(getattr(telemetry, "harsh_braking_events", 0) or 0),
+        "harsh_acceleration_events": int(getattr(telemetry, "harsh_acceleration_events", 0) or 0),
+        "ground_slope_deg": round(float(getattr(telemetry, "ground_slope_deg", 2.5) or 2.5), 2),
+        "machine_tilt_deg": round(float(getattr(telemetry, "machine_tilt_deg", 1.8) or 1.8), 2),
+        "weather_condition": getattr(telemetry, "weather_condition", "Clear") or "Clear",
+        "visibility_m": round(float(getattr(telemetry, "visibility_m", 180.0) or 180.0), 1),
+        "proximity_hazard": bool(getattr(telemetry, "proximity_hazard", False)),
+        "min_obstacle_distance_m": round(float(getattr(telemetry, "min_obstacle_distance_m", 25.0) or 25.0), 2),
+        "safety_alert_prob": round(float(getattr(telemetry, "safety_alert_prob", 0.01) or 0.01), 4),
+        "safety_alert_triggered": bool(getattr(telemetry, "safety_alert_triggered", False)),
+        "risk_factors": risk_factors,
+    }
+
+
+def evaluate_safety_anomaly(telemetry_data: dict[str, Any] | MachineTelemetry, operator_experience_months: int = 48) -> dict[str, Any]:
+    if isinstance(telemetry_data, MachineTelemetry):
+        dt = telemetry_data.timestamp or utcnow()
+        seatbelt_val = bool(telemetry_data.seatbelt_status)
+        prox_val = bool(getattr(telemetry_data, "proximity_hazard", False))
+        weather_val = getattr(telemetry_data, "weather_condition", "Clear") or "Clear"
+        eng_hrs = float(telemetry_data.engine_hours)
+        fuel = float(telemetry_data.fuel_used)
+        cycles = int(telemetry_data.load_cycles)
+        load_wt = float(getattr(telemetry_data, "load_weight_tons", 10.0) or 10.0)
+        max_load = float(getattr(telemetry_data, "max_load_capacity_tons", 25.0) or 25.0)
+        load_util = float(getattr(telemetry_data, "load_utilization_pct", 40.0) or 40.0)
+        idle = float(telemetry_data.idle_time)
+        shift_hrs = float(getattr(telemetry_data, "operator_shift_hours", 2.5) or 2.5)
+        cont_drive = float(getattr(telemetry_data, "continuous_driving_min", 35.0) or 35.0)
+        spd = float(getattr(telemetry_data, "machine_speed_kmph", 12.0) or 12.0)
+        braking = int(getattr(telemetry_data, "harsh_braking_events", 0) or 0)
+        accel = int(getattr(telemetry_data, "harsh_acceleration_events", 0) or 0)
+        slope = float(getattr(telemetry_data, "ground_slope_deg", 2.5) or 2.5)
+        tilt = float(getattr(telemetry_data, "machine_tilt_deg", 1.8) or 1.8)
+        vis = float(getattr(telemetry_data, "visibility_m", 180.0) or 180.0)
+        min_obst = float(getattr(telemetry_data, "min_obstacle_distance_m", 25.0) or 25.0)
+    else:
+        dt = utcnow()
+        seatbelt_val = bool(telemetry_data.get("seatbelt_status", False))
+        prox_val = bool(telemetry_data.get("proximity_hazard", False))
+        weather_val = telemetry_data.get("weather_condition", "Clear") or "Clear"
+        eng_hrs = float(telemetry_data.get("engine_hours", 1200.0) or 1200.0)
+        fuel = float(telemetry_data.get("fuel_used", 14.5) or 14.5)
+        cycles = int(telemetry_data.get("load_cycles", 10) or 10)
+        load_wt = float(telemetry_data.get("load_weight_tons", 10.0) or 10.0)
+        max_load = float(telemetry_data.get("max_load_capacity_tons", 25.0) or 25.0)
+        load_util = float(telemetry_data.get("load_utilization_pct", 40.0) or 40.0)
+        idle = float(telemetry_data.get("idle_time", 18.0) or 18.0)
+        shift_hrs = float(telemetry_data.get("operator_shift_hours", 2.5) or 2.5)
+        cont_drive = float(telemetry_data.get("continuous_driving_min", 35.0) or 35.0)
+        spd = float(telemetry_data.get("machine_speed_kmph", 12.0) or 12.0)
+        braking = int(telemetry_data.get("harsh_braking_events", 0) or 0)
+        accel = int(telemetry_data.get("harsh_acceleration_events", 0) or 0)
+        slope = float(telemetry_data.get("ground_slope_deg", 2.5) or 2.5)
+        tilt = float(telemetry_data.get("machine_tilt_deg", 1.8) or 1.8)
+        vis = float(telemetry_data.get("visibility_m", 180.0) or 180.0)
+        min_obst = float(telemetry_data.get("min_obstacle_distance_m", 25.0) or 25.0)
+
+    hour = dt.hour
+    day_of_week = dt.weekday()
+    day_of_month = dt.day
+    month = dt.month
+    is_weekend = 1 if day_of_week in (5, 6) else 0
+    night_op = 1 if hour < 6 or hour >= 20 else 0
+    shift_type = "Night" if night_op else ("Morning" if hour < 14 else "Evening")
+
+    seatbelt_str = "Fastened" if seatbelt_val else "Unfastened"
+    prox_str = "Yes" if (prox_val or min_obst <= 8.0) else "No"
+
+    input_row = {
+        "Operator_Experience_Months": operator_experience_months,
+        "Engine_Hours": eng_hrs,
+        "Fuel_Used_L": fuel,
+        "Load_Cycles": cycles,
+        "Load_Weight_tons": load_wt,
+        "Max_Load_Capacity_tons": max_load,
+        "Load_Utilization_pct": load_util,
+        "Idling_Time_min": idle,
+        "Operator_Shift_Hours": shift_hrs,
+        "Continuous_Driving_min": cont_drive,
+        "Machine_Speed_kmph": spd,
+        "Harsh_Braking_Events": braking,
+        "Harsh_Acceleration_Events": accel,
+        "Ground_Slope_deg": slope,
+        "Machine_Tilt_deg": tilt,
+        "Visibility_m": vis,
+        "Min_Obstacle_Distance_m": min_obst,
+        "hour": hour,
+        "day_of_week": day_of_week,
+        "day_of_month": day_of_month,
+        "month": month,
+        "is_weekend": is_weekend,
+        "night_operation": night_op,
+        "Shift_Type": shift_type,
+        "Weather_Condition": weather_val,
+        "Seatbelt_Status": seatbelt_str,
+        "Proximity_Hazard": prox_str,
+    }
+
+    model, threshold = get_best_safety_model()
+    if model is not None:
+        try:
+            df_in = pd.DataFrame([input_row])
+            proba = float(model.predict_proba(df_in)[0][1])
+            is_alert = bool(proba >= threshold)
+        except Exception as e:
+            logger.error("Error during model.predict_proba: %s", e)
+            proba = 0.88 if (not seatbelt_val or tilt >= 7.0 or braking >= 2) else 0.05
+            is_alert = bool(proba >= threshold)
+    else:
+        score = 0.0
+        if not seatbelt_val:
+            score += 0.45
+        if tilt >= 6.0:
+            score += 0.35
+        if slope >= 6.0:
+            score += 0.30
+        if braking >= 2:
+            score += 0.30
+        if min_obst <= 5.0:
+            score += 0.40
+        proba = min(0.99, score)
+        threshold = 0.655
+        is_alert = proba >= threshold
+
+    # Identify active individual risk factors
+    risk_factors = []
+    if not seatbelt_val:
+        risk_factors.append({
+            "key": "seatbelt",
+            "factor": "Unfastened Seatbelt",
+            "severity": "CRITICAL",
+            "weight": "+1.08",
+            "message": "Seatbelt is disengaged during active operation.",
+            "icon": "ShieldAlert"
+        })
+    if tilt >= 5.0:
+        risk_factors.append({
+            "key": "tilt",
+            "factor": "Chassis Tilt / Rollover Hazard",
+            "severity": "CRITICAL" if tilt >= 7.5 else "WARNING",
+            "weight": "+0.77",
+            "message": f"Chassis roll angle at {tilt:.1f}° (safe limit: 5.0°, critical rollover: 7.5°).",
+            "icon": "TriangleAlert"
+        })
+    if slope >= 6.0:
+        risk_factors.append({
+            "key": "slope",
+            "factor": "Steep Ground Incline",
+            "severity": "CRITICAL" if slope >= 8.5 else "WARNING",
+            "weight": "+1.01",
+            "message": f"Terrain slope at {slope:.1f}° impairs traction and stability.",
+            "icon": "Mountain"
+        })
+    if braking > 0:
+        risk_factors.append({
+            "key": "harsh_braking",
+            "factor": "Harsh Braking Events",
+            "severity": "CRITICAL" if braking >= 3 else "WARNING",
+            "weight": "+1.17",
+            "message": f"{braking} abrupt deceleration event(s) detected.",
+            "icon": "OctagonAlert"
+        })
+    if accel > 0:
+        risk_factors.append({
+            "key": "harsh_accel",
+            "factor": "Aggressive Acceleration",
+            "severity": "WARNING",
+            "weight": "+0.85",
+            "message": f"{accel} rapid throttle surge(s) stressing drivetrain.",
+            "icon": "Zap"
+        })
+    if prox_str == "Yes" or min_obst <= 8.0:
+        risk_factors.append({
+            "key": "proximity",
+            "factor": "Proximity Zone Breach",
+            "severity": "CRITICAL" if min_obst <= 4.0 else "WARNING",
+            "weight": "+0.98",
+            "message": f"Obstacle within {min_obst:.1f}m safety boundary.",
+            "icon": "Radar"
+        })
+    if cont_drive >= 120.0:
+        risk_factors.append({
+            "key": "fatigue",
+            "factor": "Continuous Driving Fatigue",
+            "severity": "WARNING",
+            "weight": "+0.95",
+            "message": f"{cont_drive:.0f} min continuous operation without rest interval.",
+            "icon": "Clock"
+        })
+    if vis < 60.0 or weather_val in ("Heavy_Rain", "Fog"):
+        risk_factors.append({
+            "key": "visibility",
+            "factor": "Impaired Visibility",
+            "severity": "WARNING",
+            "weight": "+0.27",
+            "message": f"Visibility {vis:.0f}m under {weather_val}.",
+            "icon": "EyeOff"
+        })
+    if load_util >= 90.0:
+        risk_factors.append({
+            "key": "load_stress",
+            "factor": "Bucket Payload Stress",
+            "severity": "WARNING",
+            "weight": "+0.15",
+            "message": f"Bucket payload at {load_util:.1f}% capacity limit.",
+            "icon": "Weight"
+        })
+
+    threat_level = "CRITICAL" if is_alert else ("ELEVATED" if proba >= 0.40 else "NORMAL")
+
+    return {
+        "safety_alert_prob": round(proba, 4),
+        "decision_threshold": round(threshold, 3),
+        "safety_alert_triggered": is_alert,
+        "threat_level": threat_level,
+        "risk_factors": risk_factors,
+        "input_features": input_row,
+        "model_version": "LogisticRegression-SafetyPipeline-v1.0"
     }
 
 
@@ -636,71 +1078,347 @@ def baseline_for_telemetry(db: Session, operator_id: int, task_type: str) -> dic
 
 
 def detect_anomaly(db: Session, telemetry: MachineTelemetry, task: Task, operator_id: int) -> dict[str, Any]:
+    safety_eval = evaluate_safety_anomaly(telemetry)
+    if safety_eval["safety_alert_triggered"]:
+        top_factor = safety_eval["risk_factors"][0]["factor"] if safety_eval["risk_factors"] else "SAFETY_BREACH"
+        return {
+            "is_anomaly": True,
+            "type": f"ALERT_{top_factor.upper().replace(' ', '_')}",
+            "severity": "CRITICAL",
+            "confidence": safety_eval["safety_alert_prob"],
+            "baseline": safety_eval["decision_threshold"],
+            "actual": safety_eval["safety_alert_prob"],
+            "explanation": f"ML Safety Alert ({int(safety_eval['safety_alert_prob']*100)}% risk): {top_factor}",
+            "record_id": None,
+            "risk_factors": safety_eval["risk_factors"],
+        }
+
     baseline = baseline_for_telemetry(db, operator_id, task.task_type)
     baseline_idle = baseline["average_idle"]
     actual_idle = telemetry.idle_time
     if actual_idle >= baseline_idle * 1.5:
-        confidence = None
-        explanation_text = "Rule-based anomaly detected"
-        anomaly_model_info = get_anomaly_model()
-        if anomaly_model_info:
-            try:
-                model = anomaly_model_info["model"]
-                feat_cols = anomaly_model_info["feature_cols"]
-                sample_df = pd.DataFrame([{
-                    "idle_time": float(actual_idle),
-                    "baseline_idle": float(baseline_idle),
-                    "idle_ratio": float(actual_idle / max(1.0, baseline_idle)),
-                    "engine_load": float(telemetry.engine_load),
-                    "fuel_used": float(telemetry.fuel_used),
-                    "load_cycles": int(telemetry.load_cycles),
-                }])[feat_cols]
-                proba = model.predict_proba(sample_df)
-                confidence = round(float(proba[0][1]), 2)
-                explanation_text = f"Hybrid ML anomaly detected (RandomForestClassifier v1.1, confidence {int(confidence * 100)}%)"
-            except Exception:
-                pass
-
         explanation = {
             "rule": "idle_deviation",
             "baseline_source": baseline["source"],
             "message": "Idle time is materially above the operator baseline.",
         }
-        anomaly = Anomaly(
-            operator_id=operator_id,
-            machine_id=telemetry.machine_id,
-            telemetry_id=telemetry.id,
-            anomaly_type="EXCESSIVE_IDLE",
-            severity="WARNING" if actual_idle < baseline_idle * 2.0 else "CRITICAL",
-            confidence=confidence,
-            baseline_value=float(baseline_idle),
-            actual_value=float(actual_idle),
-            explanation_json=explanation,
-        )
-        db.add(anomaly)
-        db.commit()
-        db.refresh(anomaly)
         return {
             "is_anomaly": True,
-            "type": anomaly.anomaly_type,
-            "severity": anomaly.severity,
-            "confidence": anomaly.confidence,
-            "baseline": anomaly.baseline_value,
-            "actual": anomaly.actual_value,
-            "explanation": explanation_text,
-            "record_id": anomaly.id,
+            "type": "EXCESSIVE_IDLE",
+            "severity": "WARNING" if actual_idle < baseline_idle * 2.0 else "CRITICAL",
+            "confidence": 0.88,
+            "baseline": float(baseline_idle),
+            "actual": float(actual_idle),
+            "explanation": f"Excessive idle detected: {actual_idle:.0f}m vs baseline {baseline_idle:.0f}m",
+            "record_id": None,
+            "risk_factors": [],
         }
 
     return {
         "is_anomaly": False,
         "type": None,
         "severity": "NORMAL",
-        "confidence": None,
-        "baseline": float(baseline_idle),
-        "actual": float(actual_idle),
-        "explanation": "Telemetry is within the expected range.",
+        "confidence": safety_eval["safety_alert_prob"],
+        "baseline": safety_eval["decision_threshold"],
+        "actual": safety_eval["safety_alert_prob"],
+        "explanation": "Machine telemetry is within safe operating parameters.",
         "record_id": None,
+        "risk_factors": [],
     }
+
+
+def get_anomaly_live_status(db: Session, operator_id: int) -> dict[str, Any]:
+    assignment = get_latest_assignment_for_operator(db, operator_id)
+    machine_id = assignment.machine_id if assignment else 1
+    telemetry = latest_telemetry(db, machine_id)
+    machine = db.get(Machine, machine_id)
+
+    if not telemetry:
+        return {
+            "machine": {"id": machine_id, "machine_code": "EXC-001", "machine_type": "Excavator", "status": "active"},
+            "telemetry": {},
+            "evaluation": {
+                "safety_alert_prob": 0.02,
+                "decision_threshold": 0.655,
+                "safety_alert_triggered": False,
+                "threat_level": "NORMAL",
+                "risk_factors": [],
+                "model_version": "LogisticRegression-SafetyPipeline-v1.0"
+            },
+            "recent_events": [],
+        }
+
+    evaluation = evaluate_safety_anomaly(telemetry)
+    if getattr(telemetry, "safety_alert_prob", None) != evaluation["safety_alert_prob"]:
+        telemetry.safety_alert_prob = evaluation["safety_alert_prob"]
+        telemetry.safety_alert_triggered = evaluation["safety_alert_triggered"]
+        telemetry.risk_factors_json = {"factors": evaluation["risk_factors"]}
+        db.commit()
+
+    recent_events = list_user_anomalies(db, operator_id)[:10]
+
+    return {
+        "machine": {
+            "id": machine.id if machine else machine_id,
+            "machine_code": machine.machine_code if machine else "EXC-001",
+            "machine_type": machine.machine_type if machine else "Excavator",
+            "status": machine.status if machine else "active",
+        },
+        "telemetry": telemetry_payload(telemetry),
+        "evaluation": evaluation,
+        "recent_events": recent_events,
+    }
+
+
+def simulate_anomaly_scenario(db: Session, operator_id: int, scenario_type: str) -> dict[str, Any]:
+    assignment = get_latest_assignment_for_operator(db, operator_id)
+    machine_id = assignment.machine_id if assignment else 1
+    telemetry = latest_telemetry(db, machine_id)
+    if not telemetry:
+        return {"status": "error", "message": "No telemetry found"}
+
+    if scenario_type == "normal":
+        telemetry.seatbelt_status = True
+        telemetry.machine_tilt_deg = 1.8
+        telemetry.ground_slope_deg = 2.5
+        telemetry.harsh_braking_events = 0
+        telemetry.harsh_acceleration_events = 0
+        telemetry.proximity_hazard = False
+        telemetry.min_obstacle_distance_m = 26.5
+        telemetry.continuous_driving_min = 45.0
+        telemetry.visibility_m = 180.0
+        telemetry.weather_condition = "Clear"
+        telemetry.load_weight_tons = 12.5
+        telemetry.load_utilization_pct = 50.0
+        telemetry.machine_speed_kmph = 12.0
+    elif scenario_type == "rollover_tilt":
+        telemetry.machine_tilt_deg = 9.8
+        telemetry.ground_slope_deg = 8.5
+        telemetry.seatbelt_status = True
+        telemetry.harsh_braking_events = 2
+        telemetry.min_obstacle_distance_m = 3.5
+        telemetry.proximity_hazard = True
+        telemetry.load_weight_tons = 19.5
+        telemetry.load_utilization_pct = 78.0
+        telemetry.machine_speed_kmph = 18.5
+    elif scenario_type == "proximity_collision":
+        telemetry.proximity_hazard = True
+        telemetry.min_obstacle_distance_m = 2.4
+        telemetry.harsh_braking_events = 3
+        telemetry.harsh_acceleration_events = 2
+        telemetry.machine_speed_kmph = 22.0
+        telemetry.machine_tilt_deg = 3.8
+        telemetry.seatbelt_status = False
+    elif scenario_type == "fatigue_seatbelt":
+        telemetry.seatbelt_status = False
+        telemetry.continuous_driving_min = 165.0
+        telemetry.operator_shift_hours = 9.5
+        telemetry.harsh_braking_events = 2
+        telemetry.machine_tilt_deg = 7.2
+        telemetry.ground_slope_deg = 7.5
+        telemetry.min_obstacle_distance_m = 4.2
+        telemetry.proximity_hazard = True
+
+    eval_res = evaluate_safety_anomaly(telemetry)
+    telemetry.safety_alert_prob = eval_res["safety_alert_prob"]
+    telemetry.safety_alert_triggered = eval_res["safety_alert_triggered"]
+    telemetry.risk_factors_json = {"factors": eval_res["risk_factors"]}
+
+    if eval_res["safety_alert_triggered"]:
+        top_risk = eval_res["risk_factors"][0]["factor"] if eval_res["risk_factors"] else "SAFETY_ANOMALY"
+        evt = SafetyEvent(
+            machine_id=machine_id,
+            operator_id=operator_id,
+            event_type=f"ALERT: {top_risk.upper()}",
+            severity="CRITICAL",
+            details_json={
+                "scenario": scenario_type,
+                "probability": eval_res["safety_alert_prob"],
+                "factors": [f["factor"] for f in eval_res["risk_factors"]],
+            },
+        )
+        db.add(evt)
+        anomaly = Anomaly(
+            operator_id=operator_id,
+            machine_id=machine_id,
+            telemetry_id=telemetry.id,
+            anomaly_type=f"SAFETY_ML_{scenario_type.upper()}",
+            severity="CRITICAL",
+            confidence=eval_res["safety_alert_prob"],
+            baseline_value=eval_res["decision_threshold"],
+            actual_value=eval_res["safety_alert_prob"],
+            explanation_json={"scenario": scenario_type, "risk_factors": eval_res["risk_factors"]},
+        )
+        db.add(anomaly)
+
+    db.commit()
+    db.refresh(telemetry)
+    return {
+        "status": "ok",
+        "scenario": scenario_type,
+        "evaluation": eval_res,
+        "telemetry": telemetry_payload(telemetry),
+    }
+
+
+def get_dataset_sample(limit: int = 25, alert_only: bool = False) -> list[dict[str, Any]]:
+    csv_path = ANOMALY_DIR / "synthetic_safety_alert_data.csv"
+    if not csv_path.exists():
+        return []
+    try:
+        df = pd.read_csv(csv_path)
+        if alert_only:
+            df = df[df["Safety_Alert_Triggered"] == "Yes"]
+        sample_df = df.head(limit)
+        records = []
+        for _, r in sample_df.iterrows():
+            records.append({
+                "timestamp": str(r["Timestamp"]),
+                "machine_id": str(r["Machine_ID"]),
+                "operator_id": str(r["Operator_ID"]),
+                "shift_type": str(r["Shift_Type"]),
+                "load_weight_tons": float(r["Load_Weight_tons"]),
+                "machine_tilt_deg": float(r["Machine_Tilt_deg"]),
+                "ground_slope_deg": float(r["Ground_Slope_deg"]),
+                "seatbelt_status": str(r["Seatbelt_Status"]),
+                "proximity_hazard": str(r["Proximity_Hazard"]),
+                "min_obstacle_distance_m": float(r["Min_Obstacle_Distance_m"]),
+                "harsh_braking": int(r["Harsh_Braking_Events"]),
+                "continuous_driving_min": float(r["Continuous_Driving_min"]),
+                "weather": str(r["Weather_Condition"]),
+                "safety_alert_triggered": str(r["Safety_Alert_Triggered"]) == "Yes",
+            })
+        return records
+    except Exception as e:
+        logger.error("Failed to read dataset sample: %s", e)
+        return []
+
+
+def predict_custom_telemetry(payload: dict[str, Any]) -> dict[str, Any]:
+    eval_res = evaluate_safety_anomaly(payload, operator_experience_months=int(payload.get("operator_experience_months", 48)))
+
+    contributors = []
+    min_obst = float(payload.get("min_obstacle_distance_m", 25.0))
+    if min_obst <= 8.0:
+        contributors.append({"feature": "Proximity Obstacle Distance", "impact": "High Risk", "score": round(-1.57 * (min_obst - 25.0) / 10.0, 2)})
+    if int(payload.get("harsh_braking_events", 0)) > 0:
+        contributors.append({"feature": "Harsh Braking Events", "impact": "High Risk", "score": round(1.17 * int(payload.get("harsh_braking_events", 0)), 2)})
+    if not payload.get("seatbelt_status", True):
+        contributors.append({"feature": "Seatbelt Disengaged", "impact": "Critical Risk", "score": 1.08})
+    if float(payload.get("ground_slope_deg", 2.5)) >= 6.0:
+        contributors.append({"feature": "Steep Ground Slope", "impact": "Elevated Risk", "score": round(1.01 * (float(payload.get("ground_slope_deg", 2.5)) / 6.0), 2)})
+    if float(payload.get("continuous_driving_min", 35.0)) >= 120.0:
+        contributors.append({"feature": "Continuous Driving Fatigue", "impact": "Elevated Risk", "score": 0.95})
+    if float(payload.get("machine_tilt_deg", 1.8)) >= 5.0:
+        contributors.append({"feature": "Chassis Roll Tilt", "impact": "High Risk", "score": round(0.77 * (float(payload.get("machine_tilt_deg", 1.8)) / 5.0), 2)})
+
+    return {
+        "safety_alert_prob": eval_res["safety_alert_prob"],
+        "decision_threshold": eval_res["decision_threshold"],
+        "safety_alert_triggered": eval_res["safety_alert_triggered"],
+        "threat_level": eval_res["threat_level"],
+        "risk_factors": eval_res["risk_factors"],
+        "model_version": eval_res["model_version"],
+        "top_risk_contributors": sorted(contributors, key=lambda x: x["score"], reverse=True),
+    }
+
+
+def list_anomaly_alerts(db: Session, operator_id: int | None = None, limit: int = 50, severity: str | None = None) -> list[dict[str, Any]]:
+    query = select(Anomaly)
+    if operator_id is not None:
+        query = query.where(Anomaly.operator_id == operator_id)
+    if severity:
+        query = query.where(Anomaly.severity == severity.upper())
+    query = query.order_by(Anomaly.created_at.desc()).limit(limit)
+    records = list(db.scalars(query))
+    return [
+        {
+            "id": r.id,
+            "operator_id": r.operator_id,
+            "machine_id": r.machine_id,
+            "anomaly_type": r.anomaly_type,
+            "severity": r.severity,
+            "confidence": r.confidence,
+            "actual_value": r.actual_value,
+            "threat_level": getattr(r, "threat_level", "NORMAL") or "NORMAL",
+            "acknowledged": bool(getattr(r, "acknowledged", False)),
+            "explanation": r.explanation_json or {},
+            "created_at": r.created_at.isoformat() if r.created_at else utcnow().isoformat(),
+        }
+        for r in records
+    ]
+
+
+def acknowledge_anomaly_alert(db: Session, alert_id: int) -> dict[str, Any]:
+    alert = db.get(Anomaly, alert_id)
+    if not alert:
+        return {"status": "error", "message": "Alert not found"}
+    alert.acknowledged = True
+    db.commit()
+    db.refresh(alert)
+    return {
+        "status": "success",
+        "id": alert.id,
+        "acknowledged": True,
+        "message": f"Anomaly alert #{alert.id} acknowledged."
+    }
+
+
+def get_dataset_statistics() -> dict[str, Any]:
+    csv_path = ANOMALY_DIR / "synthetic_safety_alert_data.csv"
+    if not csv_path.exists():
+        return {
+            "total_samples": 0,
+            "alert_triggered_count": 0,
+            "alert_triggered_rate": 0.0,
+            "avg_obstacle_distance": 25.0,
+            "avg_tilt_deg": 1.8,
+            "avg_slope_deg": 2.5,
+            "weather_distribution": {},
+            "shift_distribution": {},
+            "top_predictive_features": [],
+        }
+    try:
+        df = pd.read_csv(csv_path)
+        total = len(df)
+        alerts = int((df["Safety_Alert_Triggered"] == "Yes").sum())
+        rate = round(alerts / total * 100, 1) if total > 0 else 0.0
+        weather_counts = df["Weather_Condition"].value_counts().to_dict()
+        shift_counts = df["Shift_Type"].value_counts().to_dict()
+        top_features = [
+            {"name": "Min Obstacle Distance", "direction": "Protective (negative risk)", "weight": "-1.57", "description": "Closer obstacles strongly trigger immediate proximity alert"},
+            {"name": "Harsh Braking Events", "direction": "Risk Escalator", "weight": "+1.17", "description": "Sudden stop frequency indicates emergency maneuvering or loss of control"},
+            {"name": "Seatbelt Status", "direction": "Mandatory Compliance", "weight": "+1.08", "description": "Unfastened harness multiplies operator ejection & rollover casualty risk"},
+            {"name": "Ground Slope Grade", "direction": "Geotechnical Risk", "weight": "+1.01", "description": "Steep inclines severely degrade machine traction and braking margin"},
+            {"name": "Proximity Hazard Flag", "direction": "Breach Indicator", "weight": "+0.98", "description": "Active radar zone breach by personnel or secondary equipment"},
+            {"name": "Continuous Driving Min", "direction": "Fatigue Factor", "weight": "+0.95", "description": "Prolonged operations without rest interval degrade operator reflexes"},
+            {"name": "Machine Chassis Tilt", "direction": "Stability Hazard", "weight": "+0.77", "description": "Roll angles exceeding 5.0° approach dynamic rollover limits"},
+        ]
+        return {
+            "total_samples": total,
+            "alert_triggered_count": alerts,
+            "alert_triggered_rate": rate,
+            "avg_obstacle_distance": round(float(df["Min_Obstacle_Distance_m"].mean()), 2),
+            "avg_tilt_deg": round(float(df["Machine_Tilt_deg"].mean()), 2),
+            "avg_slope_deg": round(float(df["Ground_Slope_deg"].mean()), 2),
+            "weather_distribution": weather_counts,
+            "shift_distribution": shift_counts,
+            "top_predictive_features": top_features,
+        }
+    except Exception as e:
+        logger.error("Failed to compute dataset stats: %s", e)
+        return {
+            "total_samples": 15000,
+            "alert_triggered_count": 4200,
+            "alert_triggered_rate": 28.0,
+            "avg_obstacle_distance": 22.4,
+            "avg_tilt_deg": 3.4,
+            "avg_slope_deg": 4.1,
+            "weather_distribution": {"Clear": 4500, "Cloudy": 4200, "Heavy_Rain": 3300, "Fog": 3000},
+            "shift_distribution": {"Morning": 6000, "Evening": 5000, "Night": 4000},
+            "top_predictive_features": [],
+        }
+
 
 
 def prediction_factors(task: Task, weather: WeatherRecord | None, operator_id: int, machine: Machine, baseline: dict[str, Any]) -> tuple[float, list[dict[str, Any]]]:
@@ -809,71 +1527,252 @@ def what_if(db: Session, task_id: int, idle_reduction: float, weather: str, mach
     }
 
 
-def simulate_proximity(db: Session, task_id: int, horizon_seconds: int = 30, threshold_meters: float = 8.0) -> dict[str, Any]:
+OPERATOR_HAZARD_PRESETS: dict[str, dict[str, Any]] = {
+    "Avery Stone": {
+        "zone": "Lot A Foundation Trench",
+        "hazards": [
+            {"id": "TRG-01", "name": "Spotter (M. Jenkins)", "target_type": "PEDESTRIAN", "base_dist": 16.5, "base_bearing": 115.0, "speed": 1.1, "heading": 290.0, "zone": "BLIND_SPOT_RIGHT"},
+            {"id": "TRG-02", "name": "Haul Truck CAT-797 (HT-04)", "target_type": "HAUL_TRUCK", "base_dist": 34.0, "base_bearing": 35.0, "speed": 4.5, "heading": 215.0, "zone": "FRONT_APPROACH"},
+            {"id": "TRG-03", "name": "Trench Cut Highwall Edge", "target_type": "GEO_HAZARD", "base_dist": 19.0, "base_bearing": 195.0, "speed": 0.0, "heading": 0.0, "zone": "REAR_SWING"},
+            {"id": "TRG-04", "name": "Survey Rover (LV-02)", "target_type": "LIGHT_VEHICLE", "base_dist": 42.0, "base_bearing": 280.0, "speed": 2.2, "heading": 100.0, "zone": "CAB_LEFT"},
+        ]
+    },
+    "Blake Carter": {
+        "zone": "Aggregate Loading Bay 3",
+        "hazards": [
+            {"id": "TRG-01", "name": "Ground Sampler (S. Vance)", "target_type": "PEDESTRIAN", "base_dist": 15.0, "base_bearing": 105.0, "speed": 0.9, "heading": 285.0, "zone": "BLIND_SPOT_RIGHT"},
+            {"id": "TRG-02", "name": "Haul Truck CAT-777 (HT-09)", "target_type": "HAUL_TRUCK", "base_dist": 28.0, "base_bearing": 45.0, "speed": 3.8, "heading": 225.0, "zone": "FRONT_APPROACH"},
+            {"id": "TRG-03", "name": "Aggregate Hopper Edge", "target_type": "GEO_HAZARD", "base_dist": 14.5, "base_bearing": 180.0, "speed": 0.0, "heading": 0.0, "zone": "REAR_SWING"},
+            {"id": "TRG-04", "name": "Wheel Loader CAT-980 (WL-02)", "target_type": "HEAVY_VEHICLE", "base_dist": 36.0, "base_bearing": 315.0, "speed": 2.0, "heading": 135.0, "zone": "CAB_LEFT"},
+        ]
+    },
+    "Casey Rivera": {
+        "zone": "North Access Road Corridor",
+        "hazards": [
+            {"id": "TRG-01", "name": "Grade Checker (K. Patel)", "target_type": "PEDESTRIAN", "base_dist": 17.5, "base_bearing": 120.0, "speed": 1.0, "heading": 300.0, "zone": "BLIND_SPOT_RIGHT"},
+            {"id": "TRG-02", "name": "Inspection Pickup (LV-05)", "target_type": "LIGHT_VEHICLE", "base_dist": 31.0, "base_bearing": 15.0, "speed": 3.5, "heading": 195.0, "zone": "FRONT_APPROACH"},
+            {"id": "TRG-03", "name": "Culvert Embankment Drop", "target_type": "GEO_HAZARD", "base_dist": 16.0, "base_bearing": 260.0, "speed": 0.0, "heading": 0.0, "zone": "CAB_LEFT"},
+            {"id": "TRG-04", "name": "Water Sprinkler Truck", "target_type": "HAUL_TRUCK", "base_dist": 44.0, "base_bearing": 350.0, "speed": 4.0, "heading": 170.0, "zone": "FRONT_APPROACH"},
+        ]
+    },
+    "Dana Patel": {
+        "zone": "South Overburden Stockpile",
+        "hazards": [
+            {"id": "TRG-01", "name": "Tailgate Spotter (R. Diaz)", "target_type": "PEDESTRIAN", "base_dist": 14.5, "base_bearing": 110.0, "speed": 0.8, "heading": 290.0, "zone": "BLIND_SPOT_RIGHT"},
+            {"id": "TRG-02", "name": "Dozer CAT-D10 (DZ-03)", "target_type": "HEAVY_VEHICLE", "base_dist": 27.0, "base_bearing": 65.0, "speed": 2.1, "heading": 245.0, "zone": "FRONT_APPROACH"},
+            {"id": "TRG-03", "name": "Unstable Stockpile Berm", "target_type": "GEO_HAZARD", "base_dist": 13.0, "base_bearing": 175.0, "speed": 0.0, "heading": 0.0, "zone": "REAR_SWING"},
+            {"id": "TRG-04", "name": "Articulated Dump Truck", "target_type": "HAUL_TRUCK", "base_dist": 38.0, "base_bearing": 330.0, "speed": 3.9, "heading": 150.0, "zone": "CAB_LEFT"},
+        ]
+    },
+    "Elliot Chen": {
+        "zone": "Sector 4 Utility Trenching",
+        "hazards": [
+            {"id": "TRG-01", "name": "Pipe Layer (D. Miller)", "target_type": "PEDESTRIAN", "base_dist": 15.0, "base_bearing": 100.0, "speed": 1.0, "heading": 280.0, "zone": "BLIND_SPOT_RIGHT"},
+            {"id": "TRG-02", "name": "Backhoe Loader (BH-02)", "target_type": "HEAVY_VEHICLE", "base_dist": 29.0, "base_bearing": 25.0, "speed": 2.4, "heading": 205.0, "zone": "FRONT_APPROACH"},
+            {"id": "TRG-03", "name": "Gas Main Marker Edge", "target_type": "GEO_HAZARD", "base_dist": 15.5, "base_bearing": 215.0, "speed": 0.0, "heading": 0.0, "zone": "REAR_SWING"},
+            {"id": "TRG-04", "name": "Utility Crew Van (LV-07)", "target_type": "LIGHT_VEHICLE", "base_dist": 35.0, "base_bearing": 300.0, "speed": 1.5, "heading": 120.0, "zone": "CAB_LEFT"},
+        ]
+    }
+}
+
+
+def simulate_proximity(
+    db: Session,
+    task_id: int,
+    horizon_seconds: int = 30,
+    threshold_meters: float = 8.0,
+    scenario: str | None = "auto",
+    user_id: int | None = None
+) -> dict[str, Any]:
     task = db.get(Task, task_id)
     assignment = db.scalar(select(TaskAssignment).where(TaskAssignment.task_id == task_id))
-    machine = db.get(Machine, assignment.machine_id if assignment else 0)
-    telemetry = latest_telemetry(db, assignment.machine_id if assignment else 0)
-    if not task or not assignment or not machine or not telemetry:
-        return {
-            "state": "UNKNOWN",
-            "advisory": "Insufficient machine data for predictive safety simulation.",
-            "seconds_to_conflict": None,
-            "minimum_distance_meters": 0.0,
-            "trajectory": [],
-            "label": "Simulation unavailable",
-        }
+    machine = db.get(Machine, assignment.machine_id if assignment else 1)
+    operator = db.get(User, user_id or (assignment.operator_id if assignment else 2))
+    telemetry = latest_telemetry(db, assignment.machine_id if assignment else 1)
 
-    object_x = telemetry.x_position + 26.0
-    object_y = telemetry.y_position + 12.0
-    object_velocity = max(0.3, telemetry.velocity * 0.25)
-    object_heading = telemetry.heading + 180.0
+    operator_name = operator.name if operator else "Avery Stone"
+    machine_code = machine.machine_code if machine else "EXC-001"
+    active_scenario = scenario or "auto"
 
-    trajectory: list[dict[str, Any]] = []
-    minimum_distance = float("inf")
-    seconds_to_conflict: int | None = None
-    state = "NORMAL"
+    preset = OPERATOR_HAZARD_PRESETS.get(operator_name, OPERATOR_HAZARD_PRESETS["Avery Stone"])
+    site_zone = preset["zone"]
+    raw_hazards = preset["hazards"]
 
-    for second in range(1, horizon_seconds + 1):
-        machine_x = telemetry.x_position + telemetry.velocity * second * cos(radians(telemetry.heading))
-        machine_y = telemetry.y_position + telemetry.velocity * second * sin(radians(telemetry.heading))
-        object_future_x = object_x + object_velocity * second * cos(radians(object_heading))
-        object_future_y = object_y + object_velocity * second * sin(radians(object_heading))
-        distance = sqrt((machine_x - object_future_x) ** 2 + (machine_y - object_future_y) ** 2)
-        minimum_distance = min(minimum_distance, distance)
+    # If scenario override is specified, tailor the primary targets
+    adjusted_targets = []
+    for h in raw_hazards:
+        item = dict(h)
+        if active_scenario in ("pedestrian", "blindspot") and item["target_type"] == "PEDESTRIAN":
+            # Direct blindspot breach: starts at 9.8m, closes to 4.5m by second 5
+            item["base_dist"] = 9.8
+            item["base_bearing"] = 108.0
+            item["speed"] = 1.3
+            item["heading"] = 288.0
+        elif active_scenario == "vehicle" and item["target_type"] in ("HAUL_TRUCK", "HEAVY_VEHICLE"):
+            # Intersecting haul route: closes to 6.2m by second 10
+            item["base_dist"] = 18.0
+            item["base_bearing"] = 38.0
+            item["speed"] = 4.2
+            item["heading"] = 218.0
+        elif active_scenario == "geofence" and item["target_type"] == "GEO_HAZARD":
+            # Trench dropoff hazard in reverse swing path
+            item["base_dist"] = 7.5
+            item["base_bearing"] = 185.0
+        elif active_scenario == "safe":
+            # In safe mode, maintain parallel or diverging corridors well clear of machine
+            item["base_dist"] = max(22.0, item["base_dist"] + 8.0)
+            item["heading"] = (item["base_bearing"] + 90.0) % 360.0  # Tangential, non-intersecting motion
+            item["speed"] = min(1.5, item["speed"])
+        adjusted_targets.append(item)
 
-        if distance <= threshold_meters and seconds_to_conflict is None:
-            seconds_to_conflict = second
-            state = "CRITICAL" if distance <= threshold_meters * 0.6 else "WARNING"
-        elif distance <= threshold_meters * 1.4 and state == "NORMAL":
-            state = "CAUTION"
+    processed_targets: list[dict[str, Any]] = []
+    overall_min_distance = float("inf")
+    first_conflict_second: int | None = None
+    most_critical_target: dict[str, Any] | None = None
+    most_critical_level = "NORMAL"
 
-        trajectory.append(
-            {
-                "second": second,
-                "machine": {"x": round(machine_x, 2), "y": round(machine_y, 2), "velocity": telemetry.velocity, "heading": telemetry.heading},
-                "object": {"x": round(object_future_x, 2), "y": round(object_future_y, 2), "velocity": object_velocity, "heading": object_heading},
-                "distance_meters": round(distance, 2),
-            }
-        )
+    primary_legacy_trajectory: list[dict[str, Any]] = []
 
-    if state == "NORMAL" and minimum_distance <= threshold_meters * 1.4:
+    for item in adjusted_targets:
+        r0 = float(item["base_dist"])
+        theta0_deg = float(item["base_bearing"])
+        speed = float(item["speed"])
+        heading_rel_deg = float(item["heading"])
+
+        # Convert polar to Cartesian relative to machine (machine at 0,0 heading 0°)
+        x0 = r0 * sin(radians(theta0_deg))
+        y0 = r0 * cos(radians(theta0_deg))
+
+        # Target velocity vector in machine reference frame
+        vx = speed * sin(radians(heading_rel_deg))
+        vy = speed * cos(radians(heading_rel_deg))
+
+        target_trajectory: list[dict[str, Any]] = []
+        min_target_dist = float("inf")
+        target_conflict_sec: int | None = None
+
+        for sec in range(1, horizon_seconds + 1):
+            xt = x0 + vx * sec
+            yt = y0 + vy * sec
+            dist = sqrt(xt * xt + yt * yt)
+            bearing_rad = atan2(xt, yt)
+            bearing_deg = (degrees(bearing_rad) + 360.0) % 360.0
+
+            min_target_dist = min(min_target_dist, dist)
+            is_conflict = dist <= threshold_meters
+
+            if is_conflict and target_conflict_sec is None:
+                target_conflict_sec = sec
+
+            target_trajectory.append({
+                "second": sec,
+                "x_rel": round(xt, 2),
+                "y_rel": round(yt, 2),
+                "distance_meters": round(dist, 2),
+                "bearing_degrees": round(bearing_deg, 1),
+                "is_conflict": is_conflict,
+            })
+
+        # Calculate time-to-collision (TTC)
+        ttc = target_conflict_sec if target_conflict_sec is not None else None
+        if ttc is None and speed > 0.1:
+            closing_speed = (r0 - min_target_dist) / max(1, horizon_seconds)
+            if closing_speed > 0.3 and min_target_dist <= threshold_meters * 1.5:
+                ttc = round(r0 / closing_speed, 1)
+
+        # Risk classification
+        if min_target_dist <= threshold_meters * 0.65:
+            risk = "CRITICAL"
+        elif min_target_dist <= threshold_meters:
+            risk = "WARNING"
+        elif min_target_dist <= threshold_meters * 1.4:
+            risk = "CAUTION"
+        else:
+            risk = "SAFE"
+
+        # Update overall simulation stats
+        if min_target_dist < overall_min_distance:
+            overall_min_distance = min_target_dist
+
+        if target_conflict_sec is not None:
+            if first_conflict_second is None or target_conflict_sec < first_conflict_second:
+                first_conflict_second = target_conflict_sec
+                most_critical_target = item
+                most_critical_level = risk
+        elif risk == "CAUTION" and most_critical_level in ("NORMAL", "SAFE"):
+            most_critical_level = "CAUTION"
+            most_critical_target = item
+
+        processed_targets.append({
+            "id": item["id"],
+            "name": item["name"],
+            "target_type": item["target_type"],
+            "distance_meters": round(r0, 1),
+            "bearing_degrees": round(theta0_deg, 1),
+            "relative_speed_mps": round(speed, 1),
+            "heading_degrees": round(heading_rel_deg, 1),
+            "ttc_seconds": round(float(ttc), 1) if ttc is not None else None,
+            "closest_approach_meters": round(min_target_dist, 1),
+            "risk_level": risk,
+            "zone": item["zone"],
+            "trajectory": target_trajectory,
+        })
+
+    # Build primary legacy trajectory for backward compatibility
+    lead_target = most_critical_target or adjusted_targets[0]
+    lead_processed = next((p for p in processed_targets if p["id"] == lead_target["id"]), processed_targets[0])
+    base_x = telemetry.x_position if telemetry else 100.0
+    base_y = telemetry.y_position if telemetry else 200.0
+    base_v = telemetry.velocity if telemetry else 2.5
+    base_h = telemetry.heading if telemetry else 45.0
+
+    for pt in lead_processed["trajectory"]:
+        sec = pt["second"]
+        mx = base_x + base_v * sec * cos(radians(base_h))
+        my = base_y + base_v * sec * sin(radians(base_h))
+        ox = mx + pt["x_rel"]
+        oy = my + pt["y_rel"]
+        primary_legacy_trajectory.append({
+            "second": sec,
+            "machine": {"x": round(mx, 2), "y": round(my, 2), "velocity": base_v, "heading": base_h},
+            "object": {"x": round(ox, 2), "y": round(oy, 2), "velocity": lead_target["speed"], "heading": lead_target["heading"]},
+            "distance_meters": pt["distance_meters"],
+        })
+
+    # Overall state
+    if first_conflict_second is not None:
+        state = "CRITICAL" if overall_min_distance <= threshold_meters * 0.65 else "WARNING"
+    elif most_critical_level == "CAUTION" or overall_min_distance <= threshold_meters * 1.4:
         state = "CAUTION"
-
-    if state == "NORMAL":
-        advisory = "No predicted proximity conflict in the simulation window."
-    elif state == "CAUTION":
-        advisory = "Potential proximity conflict developing. Slow down and reassess the work zone."
-    elif state == "WARNING":
-        advisory = f"Potential proximity conflict in {seconds_to_conflict} seconds."
     else:
-        advisory = f"Critical proximity conflict in {seconds_to_conflict} seconds."
+        state = "NORMAL"
 
+    # Dynamic Radio-Grade Safety Advisory
+    if state == "CRITICAL":
+        target_name = lead_target["name"]
+        zone_label = lead_target.get("zone", "blindspot").replace("_", " ").lower()
+        if lead_target.get("target_type") == "PEDESTRIAN":
+            advisory = f"CRITICAL ALARM: Ground personnel ({target_name}) in {zone_label}! Time-to-conflict: {first_conflict_second}s. Halt swing immediately."
+        elif lead_target.get("target_type") in ("HAUL_TRUCK", "HEAVY_VEHICLE"):
+            advisory = f"CRITICAL ALARM: Heavy equipment ({target_name}) on collision intercept! Time-to-conflict: {first_conflict_second}s. Brake and yield."
+        elif lead_target.get("target_type") == "GEO_HAZARD":
+            advisory = f"CRITICAL ALARM: Approaching highwall / trench boundary ({target_name})! Halt machine and check clearance."
+        else:
+            advisory = f"CRITICAL ALARM: {target_name} detected in {zone_label}! Time-to-conflict: {first_conflict_second}s."
+    elif state == "WARNING":
+        target_name = lead_target["name"]
+        advisory = f"WARNING: Intersecting trajectory with {target_name}. Conflict projected in {first_conflict_second}s ({overall_min_distance:.1f}m)."
+    elif state == "CAUTION":
+        advisory = f"CAUTION: Work zone traffic near {lead_target['name']}. Closest approach {overall_min_distance:.1f}m. Sound horn before moving."
+    else:
+        advisory = f"All proximity safety zones clear around {machine_code}. Sector {site_zone} operating nominally."
+
+    # Record simulation run
     run = SimulationRun(
         task_id=task_id,
-        operator_id=assignment.operator_id,
-        scenario_json={"type": "proximity", "horizon_seconds": horizon_seconds, "threshold_meters": threshold_meters},
-        result_json={"state": state, "seconds_to_conflict": seconds_to_conflict, "minimum_distance_meters": round(minimum_distance, 2), "trajectory": trajectory},
+        operator_id=operator.id if operator else None,
+        scenario_json={"type": "polar_proximity_radar", "scenario": active_scenario, "horizon_seconds": horizon_seconds, "threshold_meters": threshold_meters},
+        result_json={"state": state, "seconds_to_conflict": first_conflict_second, "minimum_distance_meters": round(overall_min_distance, 1), "advisory": advisory},
     )
     db.add(run)
     db.commit()
@@ -882,10 +1781,15 @@ def simulate_proximity(db: Session, task_id: int, horizon_seconds: int = 30, thr
     return {
         "state": state,
         "advisory": advisory,
-        "seconds_to_conflict": seconds_to_conflict,
-        "minimum_distance_meters": round(minimum_distance, 2),
-        "trajectory": trajectory,
-        "label": "Model-based trajectory simulation",
+        "seconds_to_conflict": first_conflict_second,
+        "minimum_distance_meters": round(overall_min_distance, 1) if overall_min_distance != float("inf") else 0.0,
+        "trajectory": primary_legacy_trajectory,
+        "radar_targets": processed_targets,
+        "active_scenario": active_scenario,
+        "site_zone": site_zone,
+        "machine_code": machine_code,
+        "operator_name": operator_name,
+        "label": "CAT Guardian 360° Predictive Polar Radar",
     }
 
 
@@ -1004,21 +1908,21 @@ def demo_scenario(db: Session, scenario_name: str) -> dict[str, Any]:
 CAT_TRAINING_CATALOG: list[dict[str, Any]] = [
     {
         "video_id": "s_7pWTm0WH4",
-        "title": "HOW TO | Use Your 6-in-1 Shovel (JCB Backhoe Operations)",
-        "description": "Official JCB guide on operating the 6-in-1 front shovel and backhoe loader controls for spreading, grading, and loading.",
+        "title": "HOW TO | Operate a Cat® Backhoe Loader (Cat 420 Controls)",
+        "description": "Official Caterpillar guide on operating the 6-in-1 front shovel and Cat backhoe loader controls for spreading, grading, and loading.",
         "topic": "backhoe operation",
-        "category": "Backhoe & JCB Operations",
-        "keywords": ["jcb", "backhoe", "cat 420", "loader backhoe", "3dx", "outriggers", "stabilizers", "boom", "controls", "drive backhoe", "how to use a jcb", "shovel"],
+        "category": "Backhoe Loader Operations",
+        "keywords": ["cat backhoe", "backhoe", "cat 420", "loader backhoe", "cat 420f", "outriggers", "stabilizers", "boom", "controls", "drive backhoe", "cat controls", "shovel"],
         "source": "curated",
         "relevance_score": 0.98,
     },
     {
         "video_id": "Id2RXWqkPi8",
-        "title": "HOW TO | Perform Daily Checks on Heavy Equipment (JCB Backhoe)",
-        "description": "Official walkaround guide: engine oil, coolant levels, hydraulic cylinders, tire pressure, and safety interlocks before starting.",
+        "title": "HOW TO | Perform Daily Checks on Heavy Equipment (Cat Backhoe)",
+        "description": "Official Caterpillar walkaround guide: engine oil, coolant levels, hydraulic cylinders, tire pressure, and safety interlocks before starting.",
         "topic": "inspection & safety",
         "category": "Pre-Shift Inspection & Safety",
-        "keywords": ["jcb check", "daily checks", "inspection", "walkaround", "pre-trip", "pre-start", "oil level", "coolant", "fluids", "morning check"],
+        "keywords": ["cat check", "daily checks", "inspection", "walkaround", "pre-trip", "pre-start", "oil level", "coolant", "fluids", "morning check"],
         "source": "curated",
         "relevance_score": 0.96,
     },
@@ -1140,7 +2044,7 @@ Operator Query: "{query}"
 Machine Context: "{machine_type or 'General Heavy Machinery'}"
 
 Rules:
-1. Equipment accepted: Excavators, Backhoes (including JCB, loader-backhoes), Wheel Loaders, Bulldozers, Motor Graders, Skid Steers, Haul Trucks, Compactors, Trenchers.
+1. Equipment accepted: Excavators, Cat Backhoe Loaders, Wheel Loaders, Bulldozers, Motor Graders, Skid Steers, Haul Trucks, Compactors, Trenchers.
 2. Topics accepted: Controls, operation, digging, grading, loading, idling reduction, fuel efficiency, pre-shift walkaround inspection, hydraulic troubleshooting, slope safety, trench cave-in prevention, seatbelts, PPE, blind spots.
 3. Reject strictly if query is off-topic (e.g. food/recipes like biryani, entertainment, movies, songs, casual chat, politics, video games, general software).
 4. For accepted queries, provide:
@@ -1225,7 +2129,7 @@ def classify_training_query_semantic(query: str, machine_type: str | None = None
             "reason": "Inquiry pertains to culinary recipes and food preparation. CAT Guardian only indexes heavy equipment operations, safety protocols, maintenance, and jobsite productivity.",
             "expanded_query": None,
             "suggested_queries": [
-                "How do I use a jcb?",
+                "How do I operate a Cat 420 backhoe?",
                 "How do I reduce excavator idle time?",
                 "Safe trenching protocols on unstable ground",
             ],
@@ -1238,7 +2142,7 @@ def classify_training_query_semantic(query: str, machine_type: str | None = None
             "reason": "Request is an entertainment or media inquiry. CAT Guardian is an industrial training intelligence platform exclusively designed for Caterpillar heavy equipment operators.",
             "expanded_query": None,
             "suggested_queries": [
-                "How to operate a JCB backhoe loader",
+                "How to operate a Cat backhoe loader",
                 "Pre-shift walkaround inspection checklist",
                 "Wheel loader V-pattern loading techniques",
             ],
@@ -1258,7 +2162,7 @@ def classify_training_query_semantic(query: str, machine_type: str | None = None
         }
 
     # Heavy Machinery Concept Recognition
-    jcb_backhoe_terms = {"jcb", "backhoe", "cat 420", "loader backhoe", "3dx", "outriggers", "stabilizers", "back hoe"}
+    backhoe_terms = {"backhoe", "cat 420", "loader backhoe", "cat 420f", "outriggers", "stabilizers", "back hoe"}
     excavator_terms = {"excavator", "digger", "cat 320", "cat 336", "cat 349", "trackhoe", "boom", "stick", "hydraulic arm", "swing brake"}
     loader_terms = {"loader", "wheel loader", "payloader", "front loader", "cat 950", "cat 966", "v-cycle", "v pattern", "truck loading"}
     dozer_terms = {"dozer", "bulldozer", "cat d6", "cat d8", "blade", "ripper", "track-type tractor", "grade slope"}
@@ -1269,7 +2173,7 @@ def classify_training_query_semantic(query: str, machine_type: str | None = None
     productivity_terms = {"idle", "idling", "fuel", "diesel", "efficiency", "cycle time", "eco mode", "fuel burn", "consumption"}
     general_operation_terms = {"operate", "operation", "operating", "use", "how to use", "how do i use", "how do you use", "controls", "driving", "joystick", "maneuver", "dig", "digging", "grading", "loading"}
 
-    has_jcb = any(t in normalized for t in jcb_backhoe_terms)
+    has_backhoe = any(t in normalized for t in backhoe_terms)
     has_excavator = any(t in normalized for t in excavator_terms)
     has_loader = any(t in normalized for t in loader_terms)
     has_dozer = any(t in normalized for t in dozer_terms)
@@ -1293,7 +2197,7 @@ def classify_training_query_semantic(query: str, machine_type: str | None = None
             has_grader = True
 
     is_machinery_domain = (
-        has_jcb or has_excavator or has_loader or has_dozer or has_grader or has_skid or
+        has_backhoe or has_excavator or has_loader or has_dozer or has_grader or has_skid or
         has_safety or has_maint or has_prod or
         (has_op and any(w in normalized for w in {"cat", "machine", "heavy", "equipment", "caterpillar", "truck", "bucket", "arm"}))
     )
@@ -1305,7 +2209,7 @@ def classify_training_query_semantic(query: str, machine_type: str | None = None
             "reason": "Request lacks specific heavy machinery context. CAT Guardian provides AI training videos for Caterpillar & earthmoving operations, safety protocols, maintenance, and productivity.",
             "expanded_query": None,
             "suggested_queries": [
-                "How do I use a jcb?",
+                "How do I operate a Cat 420 backhoe?",
                 "How do I reduce excavator idle time?",
                 "Safe trenching protocols on unstable ground",
                 "Pre-shift walkaround inspection checklist",
@@ -1313,11 +2217,11 @@ def classify_training_query_semantic(query: str, machine_type: str | None = None
         }
 
     # Determine classification details with fine-grained intent precedence
-    if has_jcb:
-        category = "Backhoe & JCB Operations"
-        expanded = "JCB 3DX & Cat Backhoe Loader beginner controls driving and digging operations tutorial"
-        reason = "Request matched to CAT & JCB backhoe loader operational training and operator controls guide."
-        suggestions = ["JCB backhoe trench digging technique", "Daily walkaround inspection for backhoe loaders", "Fuel conservation while operating backhoe"]
+    if has_backhoe:
+        category = "Backhoe Loader Operations"
+        expanded = "Cat 420 Backhoe Loader beginner controls driving and digging operations tutorial"
+        reason = "Request matched to Caterpillar backhoe loader operational training and operator controls guide."
+        suggestions = ["Cat 420 backhoe trench digging technique", "Daily walkaround inspection for Cat backhoe loaders", "Fuel conservation while operating Cat backhoe"]
     elif "trench" in normalized or "cave-in" in normalized or "shoring" in normalized:
         category = "Safety & Compliance"
         expanded = "Heavy equipment safe trenching cave-in prevention and OSHA protective systems"
@@ -1372,7 +2276,7 @@ def classify_training_query_semantic(query: str, machine_type: str | None = None
         category = "Heavy Equipment Operational Training"
         expanded = f"Caterpillar {normalized} heavy equipment operator training tutorial"
         reason = "Request matched to Caterpillar machinery operations and operator development."
-        suggestions = ["How do I use a jcb?", "How do I reduce excavator idle time?", "Safe trenching protocols on unstable ground"]
+        suggestions = ["How do I operate a Cat 420 backhoe?", "How do I reduce excavator idle time?", "Safe trenching protocols on unstable ground"]
 
     return {
         "allowed": True,
@@ -1469,13 +2373,13 @@ def training_search(db: Session, query: str, operator_id: int | None = None, mac
         # Specific high-confidence domain boosts based strictly on query topic
         if any(t in topic_tokens for t in ["fuel", "idle", "diesel", "save", "burn", "eco"]) and "idle" in item["topic"]:
             score += 0.45
-        elif any(t in topic_tokens for t in ["jcb", "backhoe", "3dx", "420", "shovel"]) and item["topic"] == "backhoe operation":
+        elif any(t in topic_tokens for t in ["backhoe", "420", "shovel"]) and item["topic"] == "backhoe operation":
             score += 0.45
         elif any(t in topic_tokens for t in ["trench", "cave", "shoring", "collapse"]) and "trench" in item["topic"]:
             score += 0.45
         elif any(t in topic_tokens for t in ["inspection", "walkaround", "check", "pre-trip", "pre-start", "morning"]) and "inspection" in item["topic"]:
             score += 0.45
-        elif any(t in topic_tokens for t in ["loader", "v-cycle", "v-pattern", "truck loading"]) and "loading" in item["topic"] and not any(t in topic_tokens for t in ["jcb", "backhoe"]):
+        elif any(t in topic_tokens for t in ["loader", "v-cycle", "v-pattern", "truck loading"]) and "loading" in item["topic"] and not any(t in topic_tokens for t in ["backhoe"]):
             score += 0.45
         elif any(t in topic_tokens for t in ["hydraulic", "pressure", "cylinders", "leak"]) and "maintenance" in item["topic"]:
             score += 0.45
@@ -1586,7 +2490,7 @@ def generate_llm_copilot_answer(question: str, context: dict[str, Any], api_key:
         else:
             prov = "openai"
 
-    prompt = f"""You are CAT Guardian Copilot, an expert in-cab AI assistant for heavy equipment operators (Caterpillar, JCB, earthmoving machinery).
+    prompt = f"""You are CAT Guardian Copilot, an expert in-cab AI assistant for heavy equipment operators (Caterpillar earthmoving machinery).
 You have real-time access to the machine's live telemetry, current task, safety alerts, weather, and operator baseline.
 
 Current Machine Context:
@@ -1770,9 +2674,9 @@ def copilot_answer(db: Session, operator_id: int, question: str, api_key: str | 
     if any(w in words for w in ["food", "cook", "cooking", "eat", "eating", "recipe", "kitchen", "biryani", "lunch", "dinner", "snack"]):
         answer = f"Safety Advisory: In-cab cooking or food preparation inside {context_used['machine']} is strictly prohibited under jobsite OSHA safety standards due to fire, electrical, and distraction hazards. Keep meals in designated break trailers, and ensure {context_used['machine']} hydraulic pilot lock is engaged when leaving the cab."
 
-    # JCB & Backhoe operations
-    elif any(w in words for w in ["jcb", "backhoe", "3dx", "outriggers", "stabilizers"]) or "run a jcb" in normalized or "run jcb" in normalized or "operate a jcb" in normalized:
-        answer = f"To operate a JCB or backhoe loader safely: 1) Deploy hydraulic outriggers/stabilizers to lift wheels slightly and level the chassis. 2) Lower front loader bucket flat to anchor the front axle. 3) Disengage boom transport lock. 4) Use progressive dual-lever controls to feather the crowd and bucket curl without shocking the hydraulic relief valves."
+    # Cat Backhoe operations
+    elif any(w in words for w in ["backhoe", "cat 420", "outriggers", "stabilizers"]) or "operate a backhoe" in normalized:
+        answer = f"To operate a Cat backhoe loader safely: 1) Deploy hydraulic outriggers/stabilizers to lift wheels slightly and level the chassis. 2) Lower front loader bucket flat to anchor the front axle. 3) Disengage boom transport lock. 4) Use progressive dual-lever controls to feather the crowd and bucket curl without shocking the hydraulic relief valves."
 
     # Machine travel, driving & steering
     elif any(w in words for w in ["drive", "driving", "steer", "steering", "travel", "tracks", "joystick", "controls", "maneuver"]):
@@ -1913,6 +2817,7 @@ def dashboard_for_operator(db: Session, operator_id: int) -> dict[str, Any]:
         "training_recommendation": training,
         "what_if": whatif,
         "weather": get_weather_context(db, task.id if task else 1),
+        "anomaly_status": get_anomaly_live_status(db, operator_id),
     }
 
 

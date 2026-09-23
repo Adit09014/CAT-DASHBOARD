@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   LayoutDashboard,
@@ -13,8 +14,7 @@ import {
   Send,
   CheckCircle2,
   ChevronRight,
-  Search,
-  Filter,
+  TriangleAlert,
 } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../services/auth';
@@ -22,466 +22,471 @@ import { Panel } from '../components/Panel';
 import { MetricCard } from '../components/MetricCard';
 import { StatusBadge } from '../components/StatusBadge';
 
-type AdminTab = 'overview' | 'dispatch' | 'fleet' | 'operators' | 'tasks' | 'safety';
+type AdminTab = 'overview' | 'sentinel' | 'dispatch' | 'fleet' | 'operators' | 'tasks' | 'safety';
+
+const navItems: { id: AdminTab; label: string; icon: React.ReactNode }[] = [
+  { id: 'overview',   label: 'Overview',       icon: <LayoutDashboard size={15} /> },
+  { id: 'sentinel',   label: 'Safety Sentinel', icon: <TriangleAlert size={15} /> },
+  { id: 'dispatch',   label: 'AI Dispatch',     icon: <Sparkles size={15} /> },
+  { id: 'fleet',      label: 'Fleet',           icon: <Truck size={15} /> },
+  { id: 'operators',  label: 'Operators',       icon: <Users size={15} /> },
+  { id: 'tasks',      label: 'Work Orders',     icon: <CalendarCheck size={15} /> },
+  { id: 'safety',     label: 'Compliance',      icon: <ShieldAlert size={15} /> },
+];
 
 export function AdminDashboardPage() {
   const { logout } = useAuth();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
-
-  const [activeTab, setActiveTab] = useState<AdminTab>('overview');
+  const [activeTab, setActiveTab]           = useState<AdminTab>('overview');
   const [selectedTaskId, setSelectedTaskId] = useState<number>(1);
   const [assignmentResult, setAssignmentResult] = useState<string | null>(null);
-  const [assigning, setAssigning] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [assigning, setAssigning]           = useState(false);
 
-  const operators = useQuery({
-    queryKey: ['admin-operators'],
-    queryFn: async () => (await api.get('/admin/operators')).data,
-  });
-
-  const machines = useQuery({
-    queryKey: ['admin-machines'],
-    queryFn: async () => (await api.get('/admin/machines')).data,
-  });
-
-  const tasks = useQuery({
-    queryKey: ['admin-tasks'],
-    queryFn: async () => (await api.get('/admin/tasks')).data,
-  });
-
-  const safetyEvents = useQuery({
-    queryKey: ['admin-safety-events'],
-    queryFn: async () => (await api.get('/admin/safety-events')).data,
-  });
-
+  const operators    = useQuery({ queryKey: ['admin-operators'],    queryFn: async () => (await api.get('/admin/operators')).data });
+  const machines     = useQuery({ queryKey: ['admin-machines'],     queryFn: async () => (await api.get('/admin/machines')).data });
+  const tasks        = useQuery({ queryKey: ['admin-tasks'],        queryFn: async () => (await api.get('/admin/tasks')).data });
+  const safetyEvents = useQuery({ queryKey: ['admin-safety-events'],queryFn: async () => (await api.get('/admin/safety-events')).data });
+  const anomalyAlerts = useQuery({ queryKey: ['anomaly-alerts'],    queryFn: async () => (await api.get('/anomaly/alerts')).data });
   const recommendation = useQuery({
     queryKey: ['admin-recommendation', selectedTaskId],
     queryFn: async () => (await api.post(`/admin/recommend-assignment?task_id=${selectedTaskId}`)).data,
     enabled: !!selectedTaskId,
   });
 
+  const refreshAll = () => {
+    queryClient.invalidateQueries({ queryKey: ['admin-operators'] });
+    queryClient.invalidateQueries({ queryKey: ['admin-machines'] });
+    queryClient.invalidateQueries({ queryKey: ['admin-tasks'] });
+    queryClient.invalidateQueries({ queryKey: ['admin-safety-events'] });
+    queryClient.invalidateQueries({ queryKey: ['anomaly-alerts'] });
+  };
+
   const handleAssign = async () => {
     if (!recommendation.data?.recommended_operator_id) return;
     try {
       setAssigning(true);
-      await api.post(
-        `/admin/assign?task_id=${selectedTaskId}&operator_id=${recommendation.data.recommended_operator_id}&machine_id=1`
-      );
-      setAssignmentResult(
-        `Assignment confirmed! Operator #${recommendation.data.recommended_operator_id} assigned to Task #${selectedTaskId}.`
-      );
+      await api.post(`/admin/assign?task_id=${selectedTaskId}&operator_id=${recommendation.data.recommended_operator_id}&machine_id=1`);
+      setAssignmentResult(`Operator #${recommendation.data.recommended_operator_id} assigned to Task #${selectedTaskId}.`);
       queryClient.invalidateQueries({ queryKey: ['admin-tasks'] });
-    } catch (err) {
-      console.error(err);
-      setAssignmentResult('Assignment failed.');
+    } catch {
+      setAssignmentResult('Assignment failed. Please retry.');
     } finally {
       setAssigning(false);
     }
   };
 
-  const selectedTask = tasks.data?.find((t: any) => t.id === selectedTaskId);
-  const recData = recommendation.data;
-  const recOperator = operators.data?.find((o: any) => o.id === recData?.recommended_operator_id);
-
-  const navItems = [
-    { id: 'overview' as AdminTab, label: 'Fleet Overview', icon: <LayoutDashboard size={18} />, count: null },
-    { id: 'dispatch' as AdminTab, label: 'AI Dispatch & Match', icon: <Sparkles size={18} />, badge: 'AI Engine' },
-    { id: 'fleet' as AdminTab, label: 'Machinery Registry', icon: <Truck size={18} />, count: machines.data?.length ?? 5 },
-    { id: 'operators' as AdminTab, label: 'Operator Roster', icon: <Users size={18} />, count: operators.data?.length ?? 5 },
-    { id: 'tasks' as AdminTab, label: 'Site Work Orders', icon: <CalendarCheck size={18} />, count: tasks.data?.length ?? 20 },
-    { id: 'safety' as AdminTab, label: 'Compliance & Safety', icon: <ShieldAlert size={18} />, count: safetyEvents.data?.length ?? 2 },
-  ];
+  const selectedTask  = tasks.data?.find((t: any) => t.id === selectedTaskId);
+  const recData       = recommendation.data;
+  const recOperator   = operators.data?.find((o: any) => o.id === recData?.recommended_operator_id);
 
   return (
-    <div className="min-h-screen bg-[#090d14] text-[#e5eefb]">
-      {/* Top Navbar */}
-      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-800 bg-slate-950/80 px-6 py-3.5 backdrop-blur-xl">
-        <div className="flex items-center gap-3">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500 font-black text-xs text-slate-950 shadow-md">
-            CAT
-          </span>
+    <div className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)] flex flex-col">
+
+      {/* ── Navbar ─────────────────────────────────────────────── */}
+      <header className="navbar">
+        <div className="navbar-logo">
+          <div className="navbar-badge">CAT</div>
           <div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-bold text-white tracking-wide">CAT Guardian Site Command</span>
-              <span className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-300">
-                ADMIN CONSOLE
-              </span>
+            <div className="text-sm font-bold text-[var(--text-primary)] tracking-tight">
+              Fleet Command
+              <span className="ml-2 chip chip-yellow text-[9px] py-0.5 align-middle">ADMIN</span>
             </div>
-            <div className="text-[11px] text-slate-400">Enterprise Heavy Equipment & Fleet Orchestration</div>
+            <div className="text-[11px] text-[var(--text-muted)]">Heavy Equipment Dispatch Console</div>
           </div>
         </div>
-
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <button
-            onClick={() => {
-              queryClient.invalidateQueries({ queryKey: ['admin-operators'] });
-              queryClient.invalidateQueries({ queryKey: ['admin-machines'] });
-              queryClient.invalidateQueries({ queryKey: ['admin-tasks'] });
-              queryClient.invalidateQueries({ queryKey: ['admin-safety-events'] });
-            }}
-            className="flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-300 transition-all hover:bg-slate-800"
-            title="Refresh Fleet Data"
+            onClick={() => navigate('/alerts')}
+            className="btn btn-secondary gap-1.5 text-xs border-rose-500/40 text-rose-300 hover:border-rose-400"
+            title="Open Safety Sentinel Anomaly & Hazard Center"
           >
-            <RefreshCcw size={13} />
+            <TriangleAlert size={12} className="text-rose-400 animate-pulse" />
+            <span className="hidden sm:inline">Safety Sentinel</span>
+            <span className="chip chip-red text-[9px] py-0 px-1 font-bold">
+              {anomalyAlerts.data?.length || 0} Alerts
+            </span>
+          </button>
+          <button onClick={refreshAll} className="btn btn-secondary gap-1.5 text-xs">
+            <RefreshCcw size={12} />
             <span className="hidden sm:inline">Sync Fleet</span>
           </button>
-          <button
-            onClick={() => logout()}
-            className="flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-1.5 text-xs font-medium text-slate-300 transition-all hover:bg-slate-800"
-          >
+          <button onClick={() => logout()} className="btn btn-ghost">
             <LogOut size={13} />
-            <span>Logout</span>
           </button>
         </div>
       </header>
 
-      {/* Main Layout: Left Sidebar Box + Right Content Area */}
-      <div className="flex min-h-[calc(100vh-65px)]">
-        {/* Left Navigation Sidebar */}
-        <aside className="w-64 flex-shrink-0 border-r border-slate-800/80 bg-slate-950/60 p-4 flex flex-col justify-between">
-          <div className="space-y-6">
-            <div>
-              <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-500 px-3 mb-2">
-                Operations Menu
-              </div>
-              <nav className="space-y-1">
-                {navItems.map((item) => {
-                  const isActive = activeTab === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => setActiveTab(item.id)}
-                      className={`group flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-xs font-semibold transition-all ${
-                        isActive
-                          ? 'border border-amber-500/40 bg-amber-500/15 text-amber-300 shadow-md shadow-amber-500/5'
-                          : 'border border-transparent text-slate-400 hover:border-slate-800 hover:bg-slate-900 hover:text-slate-200'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <span className={isActive ? 'text-amber-400' : 'text-slate-400 group-hover:text-slate-200'}>
-                          {item.icon}
-                        </span>
-                        <span>{item.label}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        {item.count !== null && item.count !== undefined && (
-                          <span
-                            className={`rounded-md px-1.5 py-0.5 text-[10px] font-mono ${
-                              isActive ? 'bg-amber-400/20 text-amber-200' : 'bg-slate-800 text-slate-400'
-                            }`}
-                          >
-                            {item.count}
-                          </span>
-                        )}
-                        {item.badge && (
-                          <span className="rounded bg-gradient-to-r from-amber-500 to-amber-600 px-1.5 py-0.5 text-[9px] font-extrabold text-slate-950 uppercase">
-                            {item.badge}
-                          </span>
-                        )}
-                      </div>
-                    </button>
-                  );
-                })}
-              </nav>
-            </div>
+      <div className="flex flex-1 min-h-0">
 
-            {/* Quick Summary Pill Box */}
-            <div className="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-3.5 space-y-2 text-xs">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Site Status</div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400">Fleet Status:</span>
-                <span className="font-bold text-emerald-400">100% Operational</span>
+        {/* ── Sidebar ────────────────────────────────────────── */}
+        <aside className="sidebar">
+          <div>
+            <div className="sidebar-section-label">Operations</div>
+            <nav className="space-y-0.5">
+              {navItems.map(item => {
+                const isActive = activeTab === item.id;
+                let count: number | null = null;
+                if (item.id === 'sentinel')  count = anomalyAlerts.data?.length ?? null;
+                if (item.id === 'fleet')     count = machines.data?.length ?? null;
+                if (item.id === 'operators') count = operators.data?.length ?? null;
+                if (item.id === 'tasks')     count = tasks.data?.length ?? null;
+                if (item.id === 'safety')    count = safetyEvents.data?.length ?? null;
+
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      if (item.id === 'sentinel') {
+                        navigate('/alerts');
+                      } else {
+                        setActiveTab(item.id);
+                      }
+                    }}
+                    className={`nav-item ${isActive ? 'active' : ''}`}
+                  >
+                    <div className="nav-item-left">
+                      <span>{item.icon}</span>
+                      <span>{item.label}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {item.id === 'dispatch' && (
+                        <span className="chip chip-yellow text-[9px] py-0 px-1.5">AI</span>
+                      )}
+                      {count !== null && (
+                        <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${isActive ? 'bg-[var(--yellow-dim)] text-[var(--yellow)]' : 'text-[var(--text-muted)]'}`}>
+                          {count}
+                        </span>
+                      )}
+                      {isActive && !count && item.id !== 'dispatch' && <ChevronRight size={12} className="opacity-50" />}
+                    </div>
+                  </button>
+                );
+              })}
+            </nav>
+
+            <div className="vitals-panel mt-4">
+              <div className="label-caps mb-2">Site Status</div>
+              <div className="vitals-row">
+                <span className="vitals-label">Fleet</span>
+                <span className="flex items-center gap-1.5 text-xs font-semibold text-[var(--green)]">
+                  <span className="dot-live" />
+                  100% Op.
+                </span>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400">Active Gate:</span>
-                <span className="font-bold text-amber-400">Enforced</span>
+              <div className="vitals-row">
+                <span className="vitals-label">Safety Gate</span>
+                <span className="text-xs font-semibold text-[var(--yellow)]">Enforced</span>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400">AI Model:</span>
-                <span className="font-mono text-[11px] text-sky-400">RF-v1.2</span>
+              <div className="vitals-row">
+                <span className="vitals-label">ML Model</span>
+                <span className="text-xs mono text-[var(--blue)]">RF-v1.2</span>
               </div>
             </div>
           </div>
 
-          <div className="border-t border-slate-800/60 pt-3 text-[11px] text-slate-500 text-center">
-            CAT Guardian Fleet v2.4
+          <div className="text-[10px] text-[var(--text-muted)] text-center border-t border-[var(--border-subtle)] pt-3">
+            Fleet Console v2.4
           </div>
         </aside>
 
-        {/* Right Content Area */}
-        <main className="flex-1 p-6 lg:p-8 overflow-y-auto">
-          {/* TAB 1: FLEET OVERVIEW */}
+        {/* ── Content ─────────────────────────────────────────── */}
+        <main className="flex-1 overflow-y-auto p-6">
+
+          {/* OVERVIEW */}
           {activeTab === 'overview' && (
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-2xl font-bold text-white">Fleet & Site Operations Overview</h2>
-                <p className="text-sm text-slate-400">Comprehensive real-time telemetry, readiness, and active site capacity.</p>
+            <div className="space-y-5 fade-up">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className="page-heading">Fleet Overview</h1>
+                  <p className="text-sm text-[var(--text-muted)] mt-1">Real-time readiness and site capacity.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="dot-live" />
+                  <span className="text-xs text-[var(--text-muted)]">Live data</span>
+                </div>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <MetricCard
-                  label="Fleet Machinery"
+                  label="Fleet Machines"
                   value={String(machines.data?.length ?? 5)}
-                  delta="5 Active"
-                  footnote="Excavators, Loaders, Dozers, Graders"
+                  delta="All operational"
+                  accent="green"
+                  dotState="live"
+                  icon={<Truck size={14} />}
                 />
                 <MetricCard
-                  label="Certified Operators"
+                  label="Operators"
                   value={String(operators.data?.length ?? 5)}
-                  delta="On Duty"
-                  footnote="5 historical performance baselines"
+                  delta="On duty"
+                  accent="blue"
+                  icon={<Users size={14} />}
                 />
                 <MetricCard
                   label="Work Orders"
                   value={String(tasks.data?.length ?? 20)}
-                  delta="Scheduled"
-                  footnote="Current site project phase"
+                  delta="Active site phase"
+                  accent="yellow"
+                  icon={<CalendarCheck size={14} />}
                 />
                 <MetricCard
-                  label="Safety Compliance"
+                  label="Safety Events"
                   value={String(safetyEvents.data?.length ?? 2)}
-                  delta="Logged Events"
-                  footnote="Pre-task gate & telemetry audit trail"
+                  delta="Audit trail"
+                  accent={safetyEvents.data?.length > 3 ? 'red' : 'neutral'}
+                  icon={<ShieldAlert size={14} />}
                 />
               </div>
 
-              <div className="grid gap-6 lg:grid-cols-2">
-                <div
-                  onClick={() => setActiveTab('dispatch')}
-                  className="group cursor-pointer rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-slate-900/60 to-slate-950 p-6 transition-all hover:border-amber-400/60"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/20 text-amber-400">
-                      <Sparkles size={24} />
-                    </div>
-                    <span className="flex items-center gap-1 text-xs font-bold text-amber-300 group-hover:translate-x-1 transition-transform">
-                      Open AI Dispatch <ChevronRight size={14} />
-                    </span>
+              {/* Fleet Safety Sentinel Banner */}
+              <div className="p-4 rounded-xl border border-rose-500/30 bg-rose-950/20 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-center gap-3.5">
+                  <div className="p-2.5 rounded-lg border border-rose-500/40 bg-rose-500/20 text-rose-400">
+                    <TriangleAlert size={22} className="animate-pulse" />
                   </div>
-                  <h3 className="mt-4 text-xl font-bold text-white">AI-Assisted Task Dispatcher</h3>
-                  <p className="mt-1 text-xs text-slate-300">
-                    Calculates transparent suitability scores (40% skill match, 30% historical performance, 20% machine fit, 10% availability) to match the best operator to each task.
-                  </p>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-white uppercase tracking-wider">
+                        Fleet Safety Sentinel & Hazard Intelligence
+                      </span>
+                      <span className="chip chip-red text-[10px] font-bold">
+                        {anomalyAlerts.data?.length || 0} Incident Alerts
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-300 mt-1">
+                      Scikit-learn pipeline monitoring rollover tilt, proximity breach, unfastened seatbelt, and operator fatigue across all active machines.
+                    </p>
+                  </div>
                 </div>
 
-                <div
-                  onClick={() => setActiveTab('safety')}
-                  className="group cursor-pointer rounded-3xl border border-sky-500/30 bg-gradient-to-br from-sky-500/10 via-slate-900/60 to-slate-950 p-6 transition-all hover:border-sky-400/60"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-500/20 text-sky-400">
-                      <ShieldAlert size={24} />
+                <div className="flex items-center gap-2 self-start md:self-auto">
+                  <button
+                    onClick={() => navigate('/alerts')}
+                    className="btn btn-secondary text-xs py-1.5 px-3 flex items-center gap-1.5 hover:border-[var(--cat-yellow)]"
+                  >
+                    <span>Open Safety Sentinel</span>
+                    <ChevronRight size={13} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div onClick={() => setActiveTab('dispatch')} className="jump-card border-[var(--yellow-border)] bg-[var(--yellow-dim)]">
+                  <div className="flex items-start justify-between">
+                    <div className="jump-card-icon bg-[rgba(245,166,35,0.2)]">
+                      <Sparkles size={18} className="text-[var(--yellow)]" />
                     </div>
-                    <span className="flex items-center gap-1 text-xs font-bold text-sky-300 group-hover:translate-x-1 transition-transform">
-                      View Compliance <ChevronRight size={14} />
-                    </span>
+                    <span className="chip chip-yellow text-[9px] py-0.5">AI ENGINE</span>
                   </div>
-                  <h3 className="mt-4 text-xl font-bold text-white">Compliance & Safety Audit</h3>
-                  <p className="mt-1 text-xs text-slate-300">
-                    Live audit trail logging every pre-task checklist gate, unfastened seatbelt lockouts, and telemetry proximity alarms.
+                  <h3 className="mt-3 text-sm font-semibold text-[var(--text-primary)]">AI Task Dispatcher</h3>
+                  <p className="mt-1 text-xs text-[var(--text-secondary)] leading-relaxed">
+                    Weighted operator matching: 40% skill · 30% history · 20% machine fit · 10% availability.
+                  </p>
+                  <div className="mt-3 flex items-center gap-1 text-xs text-[var(--yellow)]">
+                    Open Dispatch <ChevronRight size={13} />
+                  </div>
+                </div>
+
+                <div onClick={() => setActiveTab('safety')} className="jump-card border-[var(--blue-border)]">
+                  <div className="flex items-start justify-between">
+                    <div className="jump-card-icon bg-[var(--blue-dim)]">
+                      <ShieldAlert size={18} className="text-[var(--blue)]" />
+                    </div>
+                    <span className="chip chip-blue text-[9px] py-0.5">AUDIT</span>
+                  </div>
+                  <h3 className="mt-3 text-sm font-semibold text-[var(--text-primary)]">Compliance & Safety</h3>
+                  <p className="mt-1 text-xs text-[var(--text-muted)] leading-relaxed">
+                    Pre-task gate lockouts, seatbelt violations, and proximity alarms — all logged immutably.
                   </p>
                 </div>
               </div>
             </div>
           )}
 
-          {/* TAB 2: AI DISPATCH & MATCH */}
+          {/* AI DISPATCH */}
           {activeTab === 'dispatch' && (
-            <div className="space-y-6">
+            <div className="space-y-5 fade-up">
               <div>
-                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.25em] text-amber-400">
-                  <Sparkles size={14} />
-                  <span>Explainable Decision Engine</span>
+                <div className="flex items-center gap-2 mb-1">
+                  <Sparkles size={14} className="text-[var(--yellow)]" />
+                  <span className="label-caps-brand">Explainable AI Engine</span>
                 </div>
-                <h2 className="mt-1 text-2xl font-bold text-white">AI-Assisted Task & Operator Matchmaker</h2>
-                <p className="text-sm text-slate-400">
-                  Select a work order to automatically calculate weighted compatibility scores and dispatch certified operators.
+                <h1 className="page-heading">Task & Operator Matching</h1>
+                <p className="text-sm text-[var(--text-muted)] mt-1">
+                  Select a work order to auto-calculate weighted compatibility scores.
                 </p>
               </div>
 
-              <div className="rounded-3xl border border-amber-500/30 bg-slate-950/80 p-6 backdrop-blur-xl shadow-2xl">
-                <div className="grid gap-6 lg:grid-cols-2">
-                  {/* Left: Task Selection & Details */}
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5 block">
-                        Select Work Order
-                      </label>
-                      <select
-                        value={selectedTaskId}
-                        onChange={(e) => {
-                          setSelectedTaskId(Number(e.target.value));
-                          setAssignmentResult(null);
-                        }}
-                        className="w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-white focus:border-amber-400 focus:outline-none"
-                      >
-                        {tasks.data?.map((task: any) => (
-                          <option key={task.id} value={task.id}>
-                            Task #{task.id}: {task.task_type} · {task.description} ({task.estimated_duration} min)
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+              <div className="grid gap-5 lg:grid-cols-2">
+                {/* Left: Task selection */}
+                <div className="card space-y-4">
+                  <div>
+                    <label className="input-label">Work Order</label>
+                    <select
+                      value={selectedTaskId}
+                      onChange={e => { setSelectedTaskId(Number(e.target.value)); setAssignmentResult(null); }}
+                      className="input-field"
+                    >
+                      {tasks.data?.map((task: any) => (
+                        <option key={task.id} value={task.id}>
+                          #{task.id} · {task.task_type} ({task.estimated_duration} min)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-                    {selectedTask && (
-                      <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 space-y-2.5">
-                        <div className="flex justify-between text-xs">
-                          <span className="text-slate-400">Required Skill:</span>
-                          <span className="font-semibold text-white">{selectedTask.required_skill}</span>
+                  {selectedTask && (
+                    <div className="card-raised space-y-2 text-xs">
+                      <div className="grid grid-cols-2 gap-y-2">
+                        <div>
+                          <div className="label-caps mb-0.5">Required Skill</div>
+                          <div className="font-semibold text-[var(--text-primary)]">{selectedTask.required_skill}</div>
                         </div>
-                        <div className="flex justify-between text-xs">
-                          <span className="text-slate-400">Expected Weather:</span>
-                          <span className="font-semibold text-white">{selectedTask.weather_condition}</span>
+                        <div>
+                          <div className="label-caps mb-0.5">Weather Spec</div>
+                          <div className="font-semibold text-[var(--text-primary)]">{selectedTask.weather_condition}</div>
                         </div>
-                        <div className="flex justify-between text-xs">
-                          <span className="text-slate-400">Estimated Duration:</span>
-                          <span className="font-semibold text-amber-300">{selectedTask.estimated_duration} minutes</span>
+                        <div>
+                          <div className="label-caps mb-0.5">Est. Duration</div>
+                          <div className="font-semibold text-[var(--yellow)] mono">{selectedTask.estimated_duration} min</div>
                         </div>
-                        <div className="flex justify-between text-xs">
-                          <span className="text-slate-400">Current Task Status:</span>
+                        <div>
+                          <div className="label-caps mb-0.5">Status</div>
                           <StatusBadge state="blue" label={selectedTask.status} />
                         </div>
                       </div>
-                    )}
+                    </div>
+                  )}
 
-                    {/* Formula Explanation */}
-                    <div className="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-4 space-y-2 text-xs text-slate-300">
-                      <div className="font-bold text-amber-400 text-xs uppercase tracking-wider">
-                        Transparent AI Scoring Breakdown:
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-400">
-                        <div className="rounded-lg border border-slate-800 bg-slate-950/70 p-2">
-                          <strong className="text-white block">40% Skill Match</strong>
-                          Task type alignment
+                  <div>
+                    <div className="label-caps mb-2">Scoring Weights</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { label: 'Skill Match',    pct: 40, color: 'progress-fill-yellow' },
+                        { label: 'History',        pct: 30, color: 'progress-fill-blue' },
+                        { label: 'Machine Fit',    pct: 20, color: 'progress-fill-green' },
+                        { label: 'Availability',   pct: 10, color: 'progress-fill-red' },
+                      ].map(item => (
+                        <div key={item.label} className="card-raised">
+                          <div className="flex items-center justify-between text-xs mb-1">
+                            <span className="text-[var(--text-muted)]">{item.label}</span>
+                            <span className="font-bold text-[var(--text-primary)] mono">{item.pct}%</span>
+                          </div>
+                          <div className="progress-track">
+                            <div className={`progress-fill ${item.color}`} style={{ width: `${item.pct * 2.5}%` }} />
+                          </div>
                         </div>
-                        <div className="rounded-lg border border-slate-800 bg-slate-950/70 p-2">
-                          <strong className="text-white block">30% Historical Metric</strong>
-                          Duration & shift efficiency
-                        </div>
-                        <div className="rounded-lg border border-slate-800 bg-slate-950/70 p-2">
-                          <strong className="text-white block">20% Machine Fit</strong>
-                          Equipment familiarity
-                        </div>
-                        <div className="rounded-lg border border-slate-800 bg-slate-950/70 p-2">
-                          <strong className="text-white block">10% Availability</strong>
-                          Shift & hours buffer
-                        </div>
-                      </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right: AI recommendation */}
+                <div className="card border-[var(--yellow-border)] space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="label-caps-brand">AI Top Match</div>
+                    <div className="kpi-value text-[var(--yellow)]" style={{ fontSize: '1.5rem' }}>
+                      {recData?.score ?? 88.0}%
                     </div>
                   </div>
 
-                  {/* Right: AI Recommendation Outcome */}
-                  <div className="rounded-2xl border-2 border-amber-500/40 bg-gradient-to-br from-amber-500/10 via-slate-900/70 to-slate-950 p-6 flex flex-col justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="jump-card-icon bg-[var(--yellow-dim)] border border-[var(--yellow-border)]">
+                      <UserCheck size={18} className="text-[var(--yellow)]" />
+                    </div>
                     <div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs uppercase tracking-[0.2em] text-amber-400 font-bold">
-                          AI Top Match Recommendation
-                        </span>
-                        <span className="rounded-full bg-amber-500 px-3 py-1 text-xs font-black text-slate-950 shadow-md">
-                          Score: {recData?.score ?? 88.0}%
-                        </span>
+                      <div className="font-bold text-[var(--text-primary)]">
+                        {recOperator?.name || 'Avery Stone'}
                       </div>
-
-                      <div className="mt-4 flex items-center gap-3.5">
-                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/40">
-                          <UserCheck size={28} />
-                        </div>
-                        <div>
-                          <h4 className="text-xl font-bold text-white">
-                            {recOperator?.name || 'Avery Stone (Hero Operator)'}
-                          </h4>
-                          <div className="text-xs text-slate-400">
-                            {recOperator?.email || 'operator@catguardian.demo'} · Machine EXC-001
-                          </div>
-                        </div>
+                      <div className="text-xs text-[var(--text-muted)]">
+                        {recOperator?.email || 'operator@catguardian.demo'} · EXC-001
                       </div>
-
-                      <div className="mt-4 rounded-xl border border-slate-800 bg-slate-950/80 p-3.5 text-xs text-slate-200 leading-relaxed">
-                        <strong className="text-amber-300">Decision Rationale:</strong>{' '}
-                        {recData?.explanation ||
-                          'Recommended due to high historical excavation consistency, low idling profile, and machine familiarity.'}
-                      </div>
-
-                      {recData?.breakdown && (
-                        <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
-                          <div className="rounded-xl bg-slate-900/80 p-2.5 border border-slate-800 flex justify-between">
-                            <span className="text-slate-400">Skill Score:</span>
-                            <strong className="text-emerald-400">{recData.breakdown.skill_task_match}%</strong>
-                          </div>
-                          <div className="rounded-xl bg-slate-900/80 p-2.5 border border-slate-800 flex justify-between">
-                            <span className="text-slate-400">History Score:</span>
-                            <strong className="text-emerald-400">
-                              {recData.breakdown.historical_performance?.toFixed(0)}%
-                            </strong>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="mt-6 pt-4 border-t border-slate-800">
-                      <button
-                        onClick={handleAssign}
-                        disabled={assigning}
-                        className="w-full flex items-center justify-center gap-2 rounded-xl border border-amber-400 bg-gradient-to-r from-amber-500 to-amber-600 px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-950 transition-all hover:from-amber-400 hover:to-amber-500 shadow-xl"
-                      >
-                        <Send size={15} className="fill-slate-950" />
-                        <span>{assigning ? 'Executing Dispatch...' : 'Confirm & Dispatch Assignment'}</span>
-                      </button>
-
-                      {assignmentResult && (
-                        <div className="mt-2 text-center text-xs font-semibold text-emerald-400 flex items-center justify-center gap-1">
-                          <CheckCircle2 size={14} />
-                          <span>{assignmentResult}</span>
-                        </div>
-                      )}
                     </div>
                   </div>
+
+                  <div className="card-raised text-xs text-[var(--text-secondary)] leading-relaxed">
+                    <span className="text-[var(--yellow)] font-semibold">Rationale: </span>
+                    {recData?.explanation || 'High excavation consistency, low idle profile, proven machine familiarity.'}
+                  </div>
+
+                  {recData?.breakdown && (
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { label: 'Skill', val: recData.breakdown.skill_task_match },
+                        { label: 'History', val: recData.breakdown.historical_performance?.toFixed(0) },
+                      ].map(item => (
+                        <div key={item.label} className="card-raised flex items-center justify-between text-xs">
+                          <span className="text-[var(--text-muted)]">{item.label}</span>
+                          <span className="font-bold text-[var(--green)] mono">{item.val}%</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <hr className="divider" />
+
+                  <button
+                    onClick={handleAssign}
+                    disabled={assigning}
+                    className="btn btn-primary w-full"
+                  >
+                    <Send size={13} />
+                    {assigning ? 'Dispatching…' : 'Confirm & Dispatch'}
+                  </button>
+
+                  {assignmentResult && (
+                    <div className="alert alert-ok text-xs">
+                      <CheckCircle2 size={13} className="flex-shrink-0 mt-0.5" />
+                      {assignmentResult}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
           )}
 
-          {/* TAB 3: MACHINERY REGISTRY */}
+          {/* FLEET */}
           {activeTab === 'fleet' && (
-            <div className="space-y-6">
-              <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="space-y-5 fade-up">
+              <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-2xl font-bold text-white">Heavy Machinery Registry</h2>
-                  <p className="text-sm text-slate-400">Status, operating hours, and maintenance tracking across all fleet units.</p>
+                  <h1 className="page-heading">Fleet Registry</h1>
+                  <p className="text-sm text-[var(--text-muted)] mt-1">Status and operating hours across all machines.</p>
                 </div>
-                <span className="text-xs text-slate-400">5 Machines Active</span>
+                <span className="chip chip-green">{machines.data?.length ?? 5} Active</span>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {machines.data?.map((machine: any) => (
-                  <div
-                    key={machine.id}
-                    className="rounded-2xl border border-slate-800 bg-slate-950/70 p-5 space-y-4 hover:border-slate-700 transition-all"
-                  >
+                  <div key={machine.id} className="card space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                          <Truck size={20} />
+                        <div className="jump-card-icon bg-[var(--yellow-dim)]">
+                          <Truck size={16} className="text-[var(--yellow)]" />
                         </div>
                         <div>
-                          <div className="font-bold text-white text-base">{machine.machine_code}</div>
-                          <div className="text-xs text-slate-400">{machine.machine_type}</div>
+                          <div className="font-bold text-[var(--text-primary)] mono">{machine.machine_code}</div>
+                          <div className="text-xs text-[var(--text-muted)]">{machine.machine_type}</div>
                         </div>
                       </div>
                       <StatusBadge
                         state={machine.status === 'active' ? 'green' : 'amber'}
-                        label={machine.status === 'active' ? 'Operational' : 'Service Due'}
+                        label={machine.status === 'active' ? 'Operational' : 'Service'}
                       />
                     </div>
-
-                    <div className="grid grid-cols-2 gap-2 text-xs border-t border-slate-800/80 pt-3">
+                    <hr className="divider" />
+                    <div className="grid grid-cols-2 gap-2 text-xs">
                       <div>
-                        <span className="text-slate-500 block">Fleet Age:</span>
-                        <span className="font-semibold text-slate-200">{machine.age_years} years</span>
+                        <div className="label-caps mb-0.5">Age</div>
+                        <div className="font-semibold text-[var(--text-primary)]">{machine.age_years} yrs</div>
                       </div>
                       <div>
-                        <span className="text-slate-500 block">Telemetry Stream:</span>
-                        <span className="font-semibold text-emerald-400">Connected</span>
+                        <div className="label-caps mb-0.5">Telemetry</div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="dot-live" />
+                          <span className="font-semibold text-[var(--green)]">Live</span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -490,144 +495,143 @@ export function AdminDashboardPage() {
             </div>
           )}
 
-          {/* TAB 4: OPERATOR ROSTER */}
+          {/* OPERATORS */}
           {activeTab === 'operators' && (
-            <div className="space-y-6">
-              <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="space-y-5 fade-up">
+              <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-2xl font-bold text-white">Certified Operator Roster</h2>
-                  <p className="text-sm text-slate-400">Active personnel, credentials, and personal baseline tracking.</p>
+                  <h1 className="page-heading">Operator Roster</h1>
+                  <p className="text-sm text-[var(--text-muted)] mt-1">Certified personnel with active performance baselines.</p>
                 </div>
-                <span className="text-xs text-slate-400">5 Operators Active</span>
+                <span className="chip chip-blue">{operators.data?.length ?? 5} On Duty</span>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {operators.data?.map((op: any) => (
-                  <div
-                    key={op.id}
-                    className="rounded-2xl border border-slate-800 bg-slate-950/70 p-5 space-y-4 hover:border-slate-700 transition-all"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2.5">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-500/10 text-sky-400 border border-sky-500/20">
-                          <Users size={20} />
-                        </div>
-                        <div>
-                          <div className="font-bold text-white text-base">{op.name}</div>
-                          <div className="text-xs text-slate-400">{op.email}</div>
-                        </div>
-                      </div>
-                      <StatusBadge state="blue" label={op.role} />
-                    </div>
-
-                    <div className="border-t border-slate-800/80 pt-3 flex justify-between text-xs">
-                      <span className="text-slate-500">Historical Profile:</span>
-                      <span className="font-semibold text-emerald-400">Baseline Active</span>
-                    </div>
-                  </div>
-                ))}
+              <div className="card">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Name</th>
+                      <th>Email</th>
+                      <th>Role</th>
+                      <th>Baseline</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {operators.data?.map((op: any) => (
+                      <tr key={op.id}>
+                        <td className="mono text-[var(--text-muted)]">{op.id}</td>
+                        <td className="font-semibold text-[var(--text-primary)]">{op.name}</td>
+                        <td>{op.email}</td>
+                        <td><StatusBadge state="blue" label={op.role} /></td>
+                        <td>
+                          <span className="text-[var(--green)] text-xs font-semibold">Active</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
 
-          {/* TAB 5: SITE WORK ORDERS */}
+          {/* WORK ORDERS */}
           {activeTab === 'tasks' && (
-            <div className="space-y-6">
-              <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="space-y-5 fade-up">
+              <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-2xl font-bold text-white">Site Work Orders & Tasks</h2>
-                  <p className="text-sm text-slate-400">Complete task schedule, required operator skills, and weather specifications.</p>
+                  <h1 className="page-heading">Work Orders</h1>
+                  <p className="text-sm text-[var(--text-muted)] mt-1">Full task schedule with skill and weather specs.</p>
                 </div>
-                <span className="text-xs text-slate-400">{tasks.data?.length ?? 20} Tasks Total</span>
+                <span className="chip chip-neutral">{tasks.data?.length ?? 20} Total</span>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {tasks.data?.map((task: any) => (
-                  <div
-                    key={task.id}
-                    className="rounded-2xl border border-slate-800/80 bg-slate-950/70 p-4 space-y-2 hover:border-slate-700 transition-all"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-mono text-amber-400 font-bold">Task #{task.id}</span>
-                      <StatusBadge state={task.status === 'scheduled' ? 'blue' : 'green'} label={task.status} />
-                    </div>
-                    <div className="font-bold text-white text-sm">{task.task_type}</div>
-                    <div className="text-xs text-slate-400">{task.description}</div>
-                    <div className="border-t border-slate-800/80 pt-2 flex justify-between text-[11px] text-slate-400">
-                      <span>Est: {task.estimated_duration} min</span>
-                      <span>Weather: {task.weather_condition}</span>
-                    </div>
-                  </div>
-                ))}
+              <div className="card">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Type</th>
+                      <th>Description</th>
+                      <th>Skill</th>
+                      <th>Duration</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tasks.data?.map((task: any) => (
+                      <tr key={task.id}>
+                        <td className="mono text-[var(--yellow)]">#{task.id}</td>
+                        <td className="font-semibold text-[var(--text-primary)]">{task.task_type}</td>
+                        <td className="max-w-[200px] truncate">{task.description}</td>
+                        <td>{task.required_skill}</td>
+                        <td className="mono">{task.estimated_duration} min</td>
+                        <td><StatusBadge state={task.status === 'scheduled' ? 'blue' : 'green'} label={task.status} /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
 
-          {/* TAB 6: COMPLIANCE & SAFETY */}
+          {/* SAFETY / COMPLIANCE */}
           {activeTab === 'safety' && (
-            <div className="space-y-6">
+            <div className="space-y-5 fade-up">
               <div>
-                <h2 className="text-2xl font-bold text-white">Compliance & Safety Audit Trail</h2>
-                <p className="text-sm text-slate-400">
-                  Immutable record of safety gate lockouts, seatbelt violations, and proximity trajectory alarms.
+                <h1 className="page-heading">Compliance Audit</h1>
+                <p className="text-sm text-[var(--text-muted)] mt-1">
+                  Pre-task gate lockouts, seatbelt violations, proximity alarms.
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-slate-800/80 bg-slate-950/80 overflow-hidden shadow-xl">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs text-slate-300">
-                    <thead className="border-b border-slate-800 bg-slate-900/90 text-[11px] uppercase tracking-wider text-slate-400">
-                      <tr>
-                        <th className="px-5 py-3.5">Timestamp</th>
-                        <th className="px-5 py-3.5">Event Type</th>
-                        <th className="px-5 py-3.5">Machine Target</th>
-                        <th className="px-5 py-3.5">Severity</th>
-                        <th className="px-5 py-3.5">Incident Details</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800/60">
-                      {safetyEvents.data?.length ? (
-                        safetyEvents.data.map((evt: any) => (
-                          <tr key={evt.id} className="hover:bg-slate-900/40 transition-colors">
-                            <td className="px-5 py-3.5 font-mono text-slate-400">
-                              {new Date(evt.timestamp).toLocaleTimeString([], {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                                second: '2-digit',
-                              })}
-                            </td>
-                            <td className="px-5 py-3.5 font-bold text-white">{evt.event_type}</td>
-                            <td className="px-5 py-3.5 font-mono text-amber-300">Machine #{evt.machine_id}</td>
-                            <td className="px-5 py-3.5">
-                              <StatusBadge
-                                state={
-                                  evt.severity?.toUpperCase() === 'CRITICAL'
-                                    ? 'red'
-                                    : evt.severity?.toUpperCase() === 'WARNING'
-                                    ? 'amber'
-                                    : 'blue'
-                                }
-                                label={evt.severity}
-                              />
-                            </td>
-                            <td className="px-5 py-3.5 text-slate-300 max-w-sm truncate">
-                              {evt.details?.message || JSON.stringify(evt.details || {})}
-                            </td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={5} className="px-5 py-8 text-center text-slate-500">
-                            Zero critical safety events recorded.
+              <div className="card overflow-x-auto">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Time</th>
+                      <th>Event</th>
+                      <th>Machine</th>
+                      <th>Severity</th>
+                      <th>Details</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {safetyEvents.data?.length ? (
+                      safetyEvents.data.map((evt: any) => (
+                        <tr key={evt.id}>
+                          <td className="mono text-[var(--text-muted)]">
+                            {new Date(evt.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                          </td>
+                          <td className="font-semibold text-[var(--text-primary)]">{evt.event_type}</td>
+                          <td className="mono text-[var(--yellow)]">#{evt.machine_id}</td>
+                          <td>
+                            <StatusBadge
+                              state={
+                                evt.severity?.toUpperCase() === 'CRITICAL' ? 'red' :
+                                evt.severity?.toUpperCase() === 'WARNING'  ? 'amber' : 'blue'
+                              }
+                              label={evt.severity}
+                            />
+                          </td>
+                          <td className="max-w-[240px] truncate">
+                            {evt.details?.message || JSON.stringify(evt.details || {})}
                           </td>
                         </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={5} className="py-8 text-center text-[var(--text-muted)]">
+                          No critical safety events recorded.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
+
         </main>
       </div>
     </div>

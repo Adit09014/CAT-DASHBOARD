@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, LogIn, ArrowRight, UserCheck, ShieldAlert } from 'lucide-react';
+import { LogIn, ArrowRight, Gauge } from 'lucide-react';
 import { useAuth } from '../services/auth';
 
 export function LoginPage() {
@@ -18,123 +18,119 @@ export function LoginPage() {
       const result = await login(loginEmail, loginPass);
       navigate(result.user.role === 'ADMIN' ? '/admin' : '/operator', { replace: true });
     } catch {
-      setError('Invalid authentication credentials.');
+      setError('Invalid credentials. Check email and password.');
     } finally {
       setLoading(false);
     }
   };
 
-  const setRole = (role: 'operator' | 'admin') => {
-    if (role === 'operator') {
-      setEmail('operator@catguardian.demo');
-      setPassword('Operator123!');
-      performLogin('operator@catguardian.demo', 'Operator123!');
-    } else {
-      setEmail('admin@catguardian.demo');
-      setPassword('Admin123!');
-      performLogin('admin@catguardian.demo', 'Admin123!');
-    }
+  const quickLogin = (role: 'operator' | 'admin') => {
+    const creds = role === 'operator'
+      ? { e: 'operator@catguardian.demo', p: 'Operator123!' }
+      : { e: 'admin@catguardian.demo',    p: 'Admin123!' };
+    setEmail(creds.e);
+    setPassword(creds.p);
+    performLogin(creds.e, creds.p);
   };
 
   return (
     <div className="login-shell">
-      <div className="login-card border border-amber-500/20 bg-slate-950/90 shadow-2xl relative overflow-hidden">
-        {/* Glow accent */}
-        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="badge-row mb-3">
-          <span className="flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-bold text-amber-300">
-            <span className="flex h-4 w-4 items-center justify-center rounded bg-amber-500 text-slate-950 text-[10px] font-black">CAT</span>
-            <span>Predict. Simulate. Act. Learn.</span>
-          </span>
+      <div className="login-card">
+        {/* Logo row */}
+        <div className="flex items-center gap-3 mb-6">
+          <div className="navbar-badge" style={{ width: 40, height: 40, borderRadius: 10, fontSize: '0.65rem' }}>CAT</div>
+          <div>
+            <div className="text-base font-bold text-[var(--text-primary)] tracking-tight">CAT Guardian</div>
+            <div className="text-xs text-[var(--text-muted)]">Industrial AI Co-Pilot</div>
+          </div>
+          <div className="ml-auto flex items-center gap-1.5">
+            <span className="dot-live" />
+            <span className="text-xs text-[var(--text-muted)]">System Online</span>
+          </div>
         </div>
 
-        <h1 className="login-title font-black tracking-tight text-white">CAT Guardian</h1>
-        <p className="login-copy text-slate-400 text-sm">
-          Industrial AI co-pilot for heavy machinery operators and fleet dispatchers.
-        </p>
+        <hr className="divider mb-6" />
 
-        {/* 1-Click Demo Quick Login Cards */}
-        <div className="mt-6">
-          <div className="text-xs uppercase tracking-wider text-slate-400 font-bold mb-2">
-            1-Click Demo Credentials:
-          </div>
-          <div className="grid gap-2 sm:grid-cols-2">
+        {/* Quick access */}
+        <div className="mb-5">
+          <div className="label-caps mb-3">Quick Access</div>
+          <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
-              onClick={() => setRole('operator')}
-              className="flex items-center justify-between rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-left transition-all hover:bg-amber-500/20"
+              onClick={() => quickLogin('operator')}
+              disabled={loading}
+              className="flex items-center justify-between p-3 rounded-lg border border-[var(--border-default)] bg-[var(--bg-raised)] hover:border-[var(--yellow-border)] hover:bg-[var(--yellow-dim)] transition-all group"
             >
               <div>
-                <div className="text-xs font-bold text-amber-300">Operator Dashboard</div>
-                <div className="text-[11px] text-slate-400">Avery Stone · EXC-001</div>
+                <div className="text-xs font-semibold text-[var(--text-primary)]">Operator</div>
+                <div className="text-[11px] text-[var(--text-muted)] mt-0.5">Avery Stone · EXC-001</div>
               </div>
-              <ArrowRight size={16} className="text-amber-400" />
+              <ArrowRight size={14} className="text-[var(--text-muted)] group-hover:text-[var(--yellow)] transition-colors" />
             </button>
 
             <button
               type="button"
-              onClick={() => setRole('admin')}
-              className="flex items-center justify-between rounded-xl border border-sky-500/40 bg-sky-500/10 p-3 text-left transition-all hover:bg-sky-500/20"
+              onClick={() => quickLogin('admin')}
+              disabled={loading}
+              className="flex items-center justify-between p-3 rounded-lg border border-[var(--border-default)] bg-[var(--bg-raised)] hover:border-[var(--blue-border)] hover:bg-[var(--blue-dim)] transition-all group"
             >
               <div>
-                <div className="text-xs font-bold text-sky-300">Admin Command</div>
-                <div className="text-[11px] text-slate-400">Fleet Dispatch & AI Assignment</div>
+                <div className="text-xs font-semibold text-[var(--text-primary)]">Admin</div>
+                <div className="text-[11px] text-[var(--text-muted)] mt-0.5">Fleet Dispatch</div>
               </div>
-              <ArrowRight size={16} className="text-sky-400" />
+              <ArrowRight size={14} className="text-[var(--text-muted)] group-hover:text-[var(--blue)] transition-colors" />
             </button>
           </div>
         </div>
 
-        {/* Standard Login Form */}
+        {/* Form */}
         <form
-          className="mt-6 space-y-4"
-          onSubmit={(e) => {
-            e.preventDefault();
-            performLogin(email, password);
-          }}
+          className="space-y-3"
+          onSubmit={(e) => { e.preventDefault(); performLogin(email, password); }}
         >
-          <label className="field">
-            <span className="text-xs font-semibold text-slate-300">Workstation Email</span>
+          <div>
+            <label className="input-label">Email</label>
             <input
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               type="email"
               autoComplete="email"
-              className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-2.5 text-sm text-white focus:border-amber-400 focus:outline-none"
+              className="input-field"
+              placeholder="user@catguardian.demo"
             />
-          </label>
+          </div>
 
-          <label className="field">
-            <span className="text-xs font-semibold text-slate-300">Security Password</span>
+          <div>
+            <label className="input-label">Password</label>
             <input
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               type="password"
               autoComplete="current-password"
-              className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-2.5 text-sm text-white focus:border-amber-400 focus:outline-none"
+              className="input-field"
+              placeholder="••••••••"
             />
-          </label>
+          </div>
 
           {error && (
-            <div className="rounded-xl border border-red-500/40 bg-red-950/40 px-4 py-2.5 text-xs text-red-200">
+            <div className="alert alert-danger text-xs">
               {error}
             </div>
           )}
 
           <button
-            className="w-full flex items-center justify-center gap-2 rounded-xl border border-amber-400 bg-gradient-to-r from-amber-500 to-amber-600 px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-950 transition-all hover:from-amber-400 hover:to-amber-500 shadow-xl"
+            className="btn btn-primary w-full mt-1"
             type="submit"
             disabled={loading}
           >
-            <LogIn size={15} />
-            {loading ? 'Authenticating with Site Server...' : 'Sign into Workstation'}
+            <LogIn size={14} />
+            {loading ? 'Authenticating…' : 'Sign In'}
           </button>
         </form>
 
-        <div className="mt-6 border-t border-slate-800/80 pt-4 text-center text-xs text-slate-500">
-          <div>Admin: admin@catguardian.demo / Admin123!</div>
-          <div className="mt-1">Operator: operator@catguardian.demo / Operator123!</div>
+        <div className="mt-5 pt-4 border-t border-[var(--border-subtle)] flex items-center gap-2">
+          <Gauge size={12} className="text-[var(--text-muted)]" />
+          <span className="text-[11px] text-[var(--text-muted)]">CAT Guardian v2.4 · Demo Environment</span>
         </div>
       </div>
     </div>

@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './services/auth';
 import { LoginPage } from './pages/LoginPage';
 import { OperatorDashboardPage } from './pages/OperatorDashboardPage';
 import { AdminDashboardPage } from './pages/AdminDashboardPage';
+import { AnomalyAlertsPage } from './pages/AnomalyAlertsPage';
 
 function ProtectedRoute({ role, children }: { role?: 'ADMIN' | 'OPERATOR'; children: ReactNode }) {
   const { user, isReady } = useAuth();
@@ -20,6 +21,7 @@ export default function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/operator" element={<ProtectedRoute role="OPERATOR"><OperatorDashboardPage /></ProtectedRoute>} />
         <Route path="/admin" element={<ProtectedRoute role="ADMIN"><AdminDashboardPage /></ProtectedRoute>} />
+        <Route path="/alerts" element={<ProtectedRoute><AnomalyAlertsPage /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </AuthProvider>

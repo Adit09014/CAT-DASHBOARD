@@ -27,10 +27,27 @@ class SafetyCheckResponse(BaseModel):
     blocking_reasons: list[str] = Field(default_factory=list)
 
 
+class RadarTarget(BaseModel):
+    id: str
+    name: str
+    target_type: str
+    distance_meters: float
+    bearing_degrees: float
+    relative_speed_mps: float
+    heading_degrees: float
+    ttc_seconds: float | None = None
+    closest_approach_meters: float
+    risk_level: str
+    zone: str
+    trajectory: list[dict[str, Any]] = Field(default_factory=list)
+
+
 class SafetySimulationRequest(BaseModel):
     task_id: int
     horizon_seconds: int = 30
     threshold_meters: float = 8.0
+    scenario: str | None = "auto"
+    operator_id: int | None = None
 
 
 class TrajectoryPoint(BaseModel):
@@ -46,6 +63,11 @@ class SafetySimulationResponse(BaseModel):
     seconds_to_conflict: int | None
     minimum_distance_meters: float
     trajectory: list[TrajectoryPoint] = Field(default_factory=list)
+    radar_targets: list[RadarTarget] = Field(default_factory=list)
+    active_scenario: str = "auto"
+    site_zone: str = "Active Sector"
+    machine_code: str = "EXC-001"
+    operator_name: str = "Avery Stone"
     label: str
 
 
@@ -140,6 +162,77 @@ class DemoScenarioResponse(BaseModel):
     details: dict[str, Any]
 
 
+class AnomalySimulateRequest(BaseModel):
+    scenario: str = "normal"
+
+
+class AnomalySimulateResponse(BaseModel):
+    status: str
+    scenario: str
+    evaluation: dict[str, Any]
+    telemetry: dict[str, Any]
+
+
+class AnomalyPredictRequest(BaseModel):
+    machine_tilt_deg: float = 1.8
+    ground_slope_deg: float = 2.5
+    min_obstacle_distance_m: float = 25.0
+    proximity_hazard: bool = False
+    seatbelt_status: bool = True
+    harsh_braking_events: int = 0
+    harsh_acceleration_events: int = 0
+    continuous_driving_min: float = 35.0
+    operator_shift_hours: float = 2.5
+    operator_experience_months: int = 48
+    machine_speed_kmph: float = 12.0
+    load_weight_tons: float = 10.0
+    max_load_capacity_tons: float = 25.0
+    load_utilization_pct: float = 40.0
+    idling_time_min: float = 18.0
+    engine_hours: float = 1200.0
+    fuel_used_l: float = 14.5
+    load_cycles: int = 10
+    weather_condition: str = "Clear"
+    visibility_m: float = 180.0
+    shift_type: str = "Morning"
+
+
+class AnomalyPredictResponse(BaseModel):
+    safety_alert_prob: float
+    decision_threshold: float
+    safety_alert_triggered: bool
+    threat_level: str
+    risk_factors: list[dict[str, Any]] = Field(default_factory=list)
+    model_version: str
+    top_risk_contributors: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class AnomalyAlertItem(BaseModel):
+    id: int
+    operator_id: int | None = None
+    machine_id: int | None = None
+    anomaly_type: str
+    severity: str
+    confidence: float | None = None
+    actual_value: float
+    threat_level: str
+    acknowledged: bool
+    explanation: dict[str, Any]
+    created_at: str
+
+
+class DatasetStatsResponse(BaseModel):
+    total_samples: int
+    alert_triggered_count: int
+    alert_triggered_rate: float
+    avg_obstacle_distance: float
+    avg_tilt_deg: float
+    avg_slope_deg: float
+    weather_distribution: dict[str, int]
+    shift_distribution: dict[str, int]
+    top_predictive_features: list[dict[str, Any]]
+
+
 class DashboardResponse(BaseModel):
     operator: dict[str, Any]
     current_machine: dict[str, Any]
@@ -152,3 +245,4 @@ class DashboardResponse(BaseModel):
     training_recommendation: dict[str, Any]
     what_if: dict[str, Any]
     weather: dict[str, Any]
+    anomaly_status: dict[str, Any] | None = None

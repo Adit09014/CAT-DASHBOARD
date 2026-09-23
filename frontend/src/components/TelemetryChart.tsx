@@ -28,37 +28,35 @@ export function TelemetryChart({
   ];
 
   return (
-    <div className="rounded-3xl border border-slate-800 bg-slate-950/80 p-5 backdrop-blur-xl">
-      <div className="flex items-center justify-between border-b border-slate-800/80 pb-4">
+    <div className="card">
+      <div className="flex items-center justify-between pb-4 mb-4 border-b border-[var(--border-subtle)]">
         <div>
-          <div className="text-xs uppercase tracking-[0.25em] text-slate-400">Live Telemetry Analysis</div>
-          <div className="mt-1 flex items-center gap-2">
-            <h3 className="text-xl font-bold text-white">Machine Health & Efficiency</h3>
-            <span className="rounded-md border border-slate-700 bg-slate-900/60 px-2 py-0.5 text-[11px] font-medium text-slate-400">
-              Deterministic IoT Feed
-            </span>
-          </div>
+          <div className="label-caps mb-1">Live Telemetry</div>
+          <h2 className="section-title">Machine Health & Efficiency</h2>
         </div>
-
-        {isAnomaly && (
-          <div className="flex items-center gap-1.5 rounded-full border border-red-500/40 bg-red-950/40 px-3 py-1 text-xs font-semibold text-red-300 animate-pulse">
-            <AlertCircle size={14} />
-            <span>Idle Anomaly Detected</span>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          <span className="dot-live" />
+          <span className="text-xs text-[var(--text-muted)]">IoT feed</span>
+          {isAnomaly && (
+            <div className="alert alert-danger py-1 px-2 text-xs animate-pulse">
+              <AlertCircle size={12} />
+              <span>Idle Anomaly</span>
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="mt-5 grid gap-6 lg:grid-cols-2">
-        {/* Left: Dual Bar Chart comparing Baseline vs Current */}
-        <div className="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-300">
-              <Clock size={15} className="text-amber-400" />
-              <span>Idling Time vs Baseline (Minutes)</span>
+      <div className="grid gap-5 lg:grid-cols-2">
+        {/* Left: Dual Bar Chart */}
+        <div className="card-raised">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Clock size={14} className="text-[var(--yellow)]" />
+              <span className="label-caps">Idle Time vs Baseline</span>
             </div>
-            <div className={`text-xs font-bold ${isAnomaly ? 'text-red-400' : 'text-slate-400'}`}>
-              {idleRatio}× Baseline
-            </div>
+            <span className={`text-xs font-bold mono ${isAnomaly ? 'text-[var(--red)]' : 'text-[var(--text-muted)]'}`}>
+              {idleRatio}×
+            </span>
           </div>
 
           <div className="mt-3 h-44 w-full">
@@ -79,53 +77,50 @@ export function TelemetryChart({
             </ResponsiveContainer>
           </div>
 
-          <div className="mt-2 flex items-center justify-around text-xs border-t border-slate-800/60 pt-2 text-slate-400">
-            <span>Normal Baseline: <strong className="text-sky-300">{baselineIdle.toFixed(0)} min</strong></span>
-            <span>Current: <strong className={isAnomaly ? 'text-red-400' : 'text-amber-300'}>{currentIdle.toFixed(0)} min</strong></span>
+          <div className="mt-2 flex items-center justify-around text-xs border-t border-[var(--border-subtle)] pt-2">
+            <span className="text-[var(--text-muted)]">Baseline: <strong className="text-[var(--blue)]">{baselineIdle.toFixed(0)} min</strong></span>
+            <span className="text-[var(--text-muted)]">Current: <strong className={isAnomaly ? 'text-[var(--red)]' : 'text-[var(--yellow)]'}>{currentIdle.toFixed(0)} min</strong></span>
           </div>
         </div>
 
-        {/* Right: Key Machine Gauges */}
+        {/* Right: Machine Gauges */}
         <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-3.5 flex flex-col justify-between">
-            <div className="flex items-center justify-between text-xs text-slate-400">
-              <span>Engine Load</span>
-              <Gauge size={15} className="text-amber-400" />
+          <div className="card-raised flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <span className="label-caps">Engine Load</span>
+              <Gauge size={13} className="text-[var(--yellow)]" />
             </div>
             <div className="my-2">
-              <div className="text-2xl font-bold text-white">{engineLoad.toFixed(1)}%</div>
-              <div className="mt-1 h-2 w-full rounded-full bg-slate-800 overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-amber-500 to-amber-400 transition-all duration-500"
-                  style={{ width: `${Math.min(100, engineLoad)}%` }}
-                />
+              <div className="kpi-value" style={{ fontSize: '1.6rem' }}>{engineLoad.toFixed(1)}%</div>
+              <div className="progress-track mt-2">
+                <div className="progress-fill progress-fill-yellow" style={{ width: `${Math.min(100, engineLoad)}%` }} />
               </div>
             </div>
-            <div className="text-[11px] text-slate-400">Operating within normal band</div>
+            <div className="kpi-sub">Normal operating band</div>
           </div>
 
-          <div className="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-3.5 flex flex-col justify-between">
-            <div className="flex items-center justify-between text-xs text-slate-400">
-              <span>Fuel Consumed</span>
-              <Fuel size={15} className="text-sky-400" />
+          <div className="card-raised flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <span className="label-caps">Fuel Used</span>
+              <Fuel size={13} className="text-[var(--blue)]" />
             </div>
             <div className="my-2">
-              <div className="text-2xl font-bold text-white">{fuelUsed.toFixed(1)} L</div>
-              <div className="mt-1 text-xs text-slate-300">~{(fuelUsed / Math.max(1, engineHours - 130)).toFixed(1)} L/hr average</div>
+              <div className="kpi-value" style={{ fontSize: '1.6rem' }}>{fuelUsed.toFixed(1)} L</div>
+              <div className="kpi-sub mt-1">~{(fuelUsed / Math.max(1, engineHours - 130)).toFixed(1)} L/hr avg</div>
             </div>
-            <div className="text-[11px] text-slate-400">Tank level nominal (74%)</div>
+            <div className="kpi-sub">Tank nominal (74%)</div>
           </div>
 
-          <div className="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-3.5 flex flex-col justify-between">
-            <div className="text-xs text-slate-400">Load Cycles</div>
-            <div className="my-1 text-2xl font-bold text-white">{loadCycles}</div>
-            <div className="text-[11px] text-slate-400">Bucket duty cycles completed</div>
+          <div className="card-raised flex flex-col justify-between">
+            <div className="label-caps mb-1">Load Cycles</div>
+            <div className="kpi-value" style={{ fontSize: '1.6rem' }}>{loadCycles}</div>
+            <div className="kpi-sub">Bucket duty cycles</div>
           </div>
 
-          <div className="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-3.5 flex flex-col justify-between">
-            <div className="text-xs text-slate-400">Engine Hours</div>
-            <div className="my-1 text-2xl font-bold text-white">{engineHours.toFixed(1)} hrs</div>
-            <div className="text-[11px] text-slate-400">Next PM service: 250 hrs</div>
+          <div className="card-raised flex flex-col justify-between">
+            <div className="label-caps mb-1">Engine Hours</div>
+            <div className="kpi-value" style={{ fontSize: '1.6rem' }}>{engineHours.toFixed(1)}</div>
+            <div className="kpi-sub">Next PM at 250 hrs</div>
           </div>
         </div>
       </div>

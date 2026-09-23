@@ -168,7 +168,7 @@ def simulate_what_if_endpoint(payload: WhatIfRequest, user: User = Depends(curre
 
 @app.post("/safety/simulate", response_model=SafetySimulationResponse)
 def safety_simulate(payload: SafetySimulationRequest, user: User = Depends(current_user), db: Session = Depends(get_db)) -> SafetySimulationResponse:
-    return SafetySimulationResponse(**simulate_proximity(db, payload.task_id, payload.horizon_seconds, payload.threshold_meters))
+    return SafetySimulationResponse(**simulate_proximity(db, payload.task_id, payload.horizon_seconds, payload.threshold_meters, payload.scenario, user.id))
 
 
 @app.post("/copilot/ask", response_model=CopilotResponse)
@@ -212,3 +212,41 @@ def demo_reset_endpoint(user: User = Depends(current_user), db: Session = Depend
 @app.post("/demo/scenario/{scenario_name}")
 def demo_scenario_endpoint(scenario_name: str, user: User = Depends(current_user), db: Session = Depends(get_db)):
     return demo_scenario(db, scenario_name)
+
+
+@app.get("/anomaly/live")
+def anomaly_live_endpoint(user: User = Depends(current_user), db: Session = Depends(get_db)):
+    return get_anomaly_live_status(db, user.id)
+
+
+@app.post("/anomaly/predict", response_model=AnomalyPredictResponse)
+def anomaly_predict_endpoint(payload: AnomalyPredictRequest, user: User = Depends(current_user)) -> AnomalyPredictResponse:
+    res = predict_custom_telemetry(payload.model_dump())
+    return AnomalyPredictResponse(**res)
+
+
+@app.post("/anomaly/simulate", response_model=AnomalySimulateResponse)
+def anomaly_simulate_endpoint(payload: AnomalySimulateRequest, user: User = Depends(current_user), db: Session = Depends(get_db)) -> AnomalySimulateResponse:
+    res = simulate_anomaly_scenario(db, user.id, payload.scenario)
+    return AnomalySimulateResponse(**res)
+
+
+@app.get("/anomaly/alerts", response_model=list[AnomalyAlertItem])
+def anomaly_alerts_endpoint(severity: str | None = None, operator_id: int | None = None, limit: int = 50, user: User = Depends(current_user), db: Session = Depends(get_db)) -> list[AnomalyAlertItem]:
+    return [AnomalyAlertItem(**item) for item in list_anomaly_alerts(db, operator_id=operator_id, limit=limit, severity=severity)]
+
+
+@app.post("/anomaly/alerts/{alert_id}/acknowledge")
+def anomaly_acknowledge_endpoint(alert_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    return acknowledge_anomaly_alert(db, alert_id)
+
+
+@app.get("/anomaly/dataset-stats", response_model=DatasetStatsResponse)
+def anomaly_dataset_stats_endpoint(user: User = Depends(current_user)) -> DatasetStatsResponse:
+    return DatasetStatsResponse(**get_dataset_statistics())
+
+
+@app.get("/anomaly/dataset-sample")
+def anomaly_dataset_sample_endpoint(limit: int = 30, alert_only: bool = False, user: User = Depends(current_user)):
+    return get_dataset_sample(limit=limit, alert_only=alert_only)
+

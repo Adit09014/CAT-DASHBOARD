@@ -117,16 +117,16 @@ def test_domain_guard_accepts_and_rejects():
     assert len(reject.json()["suggested_queries"]) > 0
 
 
-def test_domain_guard_natural_language_jcb():
+def test_domain_guard_natural_language_cat_backhoe():
     headers = auth_headers("operator@catguardian.demo", "Operator123!")
-    res = client.post("/training/search", headers=headers, json={"query": "How do I use a jcb"})
+    res = client.post("/training/search", headers=headers, json={"query": "How do I operate a Cat 420 backhoe?"})
     assert res.status_code == 200
     data = res.json()
     assert data["allowed"] is True
-    assert data["category"] == "Backhoe & JCB Operations"
+    assert "Backhoe" in data["category"]
     assert len(data["results"]) > 0
     top = data["results"][0]
-    assert "jcb" in top["title"].lower() or "backhoe" in top["title"].lower()
+    assert "cat" in top["title"].lower() or "backhoe" in top["title"].lower()
     # Ensure Rick Astley is never returned!
     assert not any(item["video_id"] == "dQw4w9WgXcQ" for item in data["results"])
     assert not any("rick" in item["title"].lower() for item in data["results"])

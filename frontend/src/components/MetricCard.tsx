@@ -1,12 +1,36 @@
-export function MetricCard({ label, value, delta, footnote }: { label: string; value: string; delta?: string; footnote?: string }) {
+import React from 'react';
+import type { ReactNode } from 'react';
+
+interface MetricCardProps {
+  label: string;
+  value: string;
+  delta?: string;
+  footnote?: string;
+  icon?: ReactNode;
+  accent?: 'green' | 'yellow' | 'red' | 'blue' | 'neutral';
+  dotState?: 'live' | 'warn' | 'danger' | null;
+}
+
+export function MetricCard({ label, value, delta, footnote, icon, accent = 'neutral', dotState }: MetricCardProps) {
+  const deltaColor =
+    accent === 'green'  ? 'text-[var(--green)]'  :
+    accent === 'yellow' ? 'text-[var(--yellow)]' :
+    accent === 'red'    ? 'text-[var(--red)]'    :
+    accent === 'blue'   ? 'text-[var(--blue)]'   :
+    'text-[var(--text-secondary)]';
+
   return (
-    <div className="metric-card">
-      <div className="text-xs uppercase tracking-[0.25em] text-slate-400">{label}</div>
-      <div className="mt-3 flex items-end justify-between gap-4">
-        <div className="text-3xl font-semibold text-white">{value}</div>
-        {delta ? <div className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-sm font-medium text-emerald-300">{delta}</div> : null}
+    <div className="kpi-card">
+      <div className="flex items-center justify-between">
+        <span className="kpi-label">{label}</span>
+        <div className="flex items-center gap-2">
+          {dotState && <span className={`dot-${dotState}`} />}
+          {icon && <span className="text-[var(--text-muted)]">{icon}</span>}
+        </div>
       </div>
-      {footnote ? <div className="mt-3 text-sm text-slate-400">{footnote}</div> : null}
+      <div className="kpi-value">{value}</div>
+      {delta && <div className={`text-xs font-semibold ${deltaColor}`}>{delta}</div>}
+      {footnote && <div className="kpi-sub">{footnote}</div>}
     </div>
   );
 }

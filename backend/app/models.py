@@ -20,6 +20,8 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
+    experience_months: Mapped[int] = mapped_column(Integer, default=48, nullable=False)
+    operator_code: Mapped[str] = mapped_column(String(32), default="OP1001", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
 
 
@@ -30,6 +32,8 @@ class Machine(Base):
     machine_code: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
     machine_type: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
     age_years: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    max_load_capacity_tons: Mapped[float] = mapped_column(Float, default=25.0, nullable=False)
+    model_series: Mapped[str] = mapped_column(String(64), default="CAT 336", nullable=False)
     status: Mapped[str] = mapped_column(String(32), default="active", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
 
@@ -78,6 +82,23 @@ class MachineTelemetry(Base):
     heading: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     engine_load: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     task_status: Mapped[str] = mapped_column(String(32), default="idle", nullable=False)
+    load_weight_tons: Mapped[float] = mapped_column(Float, default=10.0, nullable=False)
+    max_load_capacity_tons: Mapped[float] = mapped_column(Float, default=25.0, nullable=False)
+    load_utilization_pct: Mapped[float] = mapped_column(Float, default=40.0, nullable=False)
+    operator_shift_hours: Mapped[float] = mapped_column(Float, default=2.5, nullable=False)
+    continuous_driving_min: Mapped[float] = mapped_column(Float, default=35.0, nullable=False)
+    machine_speed_kmph: Mapped[float] = mapped_column(Float, default=12.0, nullable=False)
+    harsh_braking_events: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    harsh_acceleration_events: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    ground_slope_deg: Mapped[float] = mapped_column(Float, default=2.5, nullable=False)
+    machine_tilt_deg: Mapped[float] = mapped_column(Float, default=1.8, nullable=False)
+    weather_condition: Mapped[str] = mapped_column(String(64), default="Clear", nullable=False)
+    visibility_m: Mapped[float] = mapped_column(Float, default=180.0, nullable=False)
+    proximity_hazard: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    min_obstacle_distance_m: Mapped[float] = mapped_column(Float, default=25.0, nullable=False)
+    safety_alert_prob: Mapped[float] = mapped_column(Float, default=0.01, nullable=False)
+    safety_alert_triggered: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    risk_factors_json: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
 
 
 class SafetyEvent(Base):
@@ -117,6 +138,8 @@ class Anomaly(Base):
     confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     baseline_value: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     actual_value: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    threat_level: Mapped[str] = mapped_column(String(32), default="NORMAL", nullable=False)
+    acknowledged: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     explanation_json: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
 
