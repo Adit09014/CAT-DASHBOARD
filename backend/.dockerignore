@@ -1,0 +1,7 @@
+.pytest_cache
+__pycache__
+catguardian.db
+.venv
+alembic/__pycache__
+alembic/versions/__pycache__
+.DS_Store

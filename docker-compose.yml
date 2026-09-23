@@ -1,0 +1,35 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: catguardian
+      POSTGRES_USER: catguardian
+      POSTGRES_PASSWORD: catguardian
+    ports:
+      - "5432:5432"
+    volumes:
+      - catguardian_pg:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://catguardian:catguardian@db:5432/catguardian
+      JWT_SECRET: change-me-in-production
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+
+  frontend:
+    build:
+      context: ./frontend
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+volumes:
+  catguardian_pg:
