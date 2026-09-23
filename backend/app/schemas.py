@@ -84,6 +84,8 @@ class WhatIfResponse(BaseModel):
 
 class CopilotRequest(BaseModel):
     question: str
+    api_key: str | None = None
+    provider: str | None = None
 
 
 class CopilotResponse(BaseModel):

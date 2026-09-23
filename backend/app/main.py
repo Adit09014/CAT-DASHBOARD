@@ -173,7 +173,7 @@ def safety_simulate(payload: SafetySimulationRequest, user: User = Depends(curre
 
 @app.post("/copilot/ask", response_model=CopilotResponse)
 def copilot_ask(payload: CopilotRequest, user: User = Depends(current_user), db: Session = Depends(get_db)) -> CopilotResponse:
-    return CopilotResponse(**copilot_answer(db, user.id, payload.question))
+    return CopilotResponse(**copilot_answer(db, user.id, payload.question, payload.api_key, payload.provider))
 
 
 @app.post("/training/search", response_model=TrainingSearchResponse)

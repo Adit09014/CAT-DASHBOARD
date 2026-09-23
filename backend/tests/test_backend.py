@@ -159,3 +159,32 @@ def test_admin_safety_events_and_recommendation():
     assert "recommended_operator_id" in rec_body
     assert "score" in rec_body
     assert rec_body["score"] > 0
+
+
+def test_copilot_ask_open_ended_queries():
+    headers = auth_headers("operator@catguardian.demo", "Operator123!")
+    
+    # 1. Custom query on load
+    res_load = client.post("/copilot/ask", headers=headers, json={"question": "What is my current engine load and rpm?"})
+    assert res_load.status_code == 200
+    body_load = res_load.json()
+    assert "load" in body_load["answer"].lower() or "engine" in body_load["answer"].lower()
+    assert "EXC-001" in body_load["answer"] or "Excavator" in body_load["context_used"].get("machine_type", "")
+    
+    # 2. Custom query on trenching technique
+    res_trench = client.post("/copilot/ask", headers=headers, json={"question": "How to avoid trench cave ins?"})
+    assert res_trench.status_code == 200
+    body_trench = res_trench.json()
+    assert "trench" in body_trench["answer"].lower() or "excavation" in body_trench["answer"].lower()
+
+    # 3. Custom query on fuel reduction
+    res_fuel = client.post("/copilot/ask", headers=headers, json={"question": "Tips to save diesel fuel"})
+    assert res_fuel.status_code == 200
+    body_fuel = res_fuel.json()
+    assert "fuel" in body_fuel["answer"].lower()
+
+    # 4. Open-ended conversational query
+    res_open = client.post("/copilot/ask", headers=headers, json={"question": "Can I operate safely in heavy mud and rain today?"})
+    assert res_open.status_code == 200
+    assert len(res_open.json()["answer"]) > 10
+

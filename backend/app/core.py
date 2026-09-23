@@ -17,12 +17,15 @@ class Settings(BaseSettings):
     jwt_secret: str = "change-me"
     jwt_algorithm: str = "HS256"
     access_token_exp_minutes: int = 60 * 12
+    groq_api_key: str | None = None
     anthropic_api_key: str | None = None
+    openai_api_key: str | None = None
+    gemini_api_key: str | None = None
     youtube_api_key: str | None = None
     weather_api_key: str | None = None
     cors_origins: list[str] = ["http://localhost:5173"]
 
-    model_config = SettingsConfigDict(env_file="../.env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(env_file=(".env", "../.env"), env_file_encoding="utf-8", extra="ignore")
 
 
 @lru_cache(maxsize=1)
