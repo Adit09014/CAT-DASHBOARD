@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LogIn, ArrowRight, Gauge } from 'lucide-react';
 import { useAuth } from '../services/auth';
+import { ThemeToggle } from '../components/ThemeToggle';
 
 export function LoginPage() {
   const { login } = useAuth();
@@ -43,9 +44,10 @@ export function LoginPage() {
             <div className="text-base font-bold text-[var(--text-primary)] tracking-tight">CAT Guardian</div>
             <div className="text-xs text-[var(--text-muted)]">Industrial AI Co-Pilot</div>
           </div>
-          <div className="ml-auto flex items-center gap-1.5">
+          <div className="ml-auto flex items-center gap-2">
             <span className="dot-live" />
-            <span className="text-xs text-[var(--text-muted)]">System Online</span>
+            <span className="text-xs text-[var(--text-muted)] mr-1">Online</span>
+            <ThemeToggle />
           </div>
         </div>
 

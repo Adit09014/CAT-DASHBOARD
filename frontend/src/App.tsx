@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { AuthProvider, useAuth } from './services/auth';
 import { LanguageProvider } from './services/i18n';
+import { ThemeProvider } from './services/theme';
 import { LoginPage } from './pages/LoginPage';
 import { OperatorDashboardPage } from './pages/OperatorDashboardPage';
 import { AdminDashboardPage } from './pages/AdminDashboardPage';
@@ -16,9 +17,10 @@ function ProtectedRoute({ role, children }: { role?: 'ADMIN' | 'OPERATOR'; child
 
 export default function App() {
   return (
-    <LanguageProvider>
-      <AuthProvider>
-        <Routes>
+    <ThemeProvider>
+      <LanguageProvider>
+        <AuthProvider>
+          <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/operator" element={<ProtectedRoute role="OPERATOR"><OperatorDashboardPage /></ProtectedRoute>} />
           <Route path="/admin" element={<ProtectedRoute role="ADMIN"><AdminDashboardPage /></ProtectedRoute>} />
@@ -27,5 +29,6 @@ export default function App() {
         </Routes>
       </AuthProvider>
     </LanguageProvider>
+  </ThemeProvider>
   );
 }

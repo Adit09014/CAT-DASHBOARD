@@ -38,6 +38,7 @@ import { AnomalySentinelPanel } from '../components/AnomalySentinelPanel';
 import { TimeEstimationPanel } from '../components/TimeEstimationPanel';
 import { useLanguage } from '../services/i18n';
 import { LanguageSelector } from '../components/LanguageSelector';
+import { ThemeToggle } from '../components/ThemeToggle';
 import { ExplainableNarrativeAlertModal, ExplainableNarrativeAlert } from '../components/ExplainableNarrativeAlertModal';
 
 type OperatorTab = 'overview' | 'duration' | 'alerts' | 'safety-gate' | 'telemetry' | 'what-if' | 'proximity' | 'training' | 'copilot';
@@ -178,6 +179,7 @@ export function OperatorDashboardPage() {
           </button>
           
           <LanguageSelector />
+          <ThemeToggle />
 
           <button onClick={refreshData} className="btn btn-ghost" title="Refresh">
             <RefreshCcw size={13} />

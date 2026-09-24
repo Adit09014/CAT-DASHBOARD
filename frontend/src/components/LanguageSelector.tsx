@@ -28,19 +28,19 @@ export function LanguageSelector() {
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen((prev) => !prev)}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-black/40 border border-white/10 hover:border-amber-400/50 text-xs text-slate-200 transition-all focus:outline-none"
+        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[var(--bg-raised)] border border-[var(--border-default)] hover:border-amber-400/50 text-xs text-[var(--text-primary)] transition-all focus:outline-none"
         title="Select Language / Seleccionar Idioma"
       >
         <span className="text-sm leading-none">{currentInfo.flag}</span>
         <span className="font-semibold hidden sm:inline">{currentInfo.nativeName}</span>
         <span className="font-mono sm:hidden">{currentInfo.code.toUpperCase()}</span>
-        <ChevronDown size={12} className={`text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown size={12} className={`text-[var(--text-muted)] transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-1.5 w-44 rounded-xl bg-slate-950/95 border border-white/15 shadow-2xl backdrop-blur-md z-50 py-1.5 overflow-hidden fade-up">
-          <div className="px-3 py-1 text-[10px] uppercase font-bold tracking-wider text-slate-400 border-b border-white/5 flex items-center gap-1.5">
-            <Globe size={11} className="text-amber-400" />
+        <div className="absolute right-0 mt-1.5 w-44 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-strong)] shadow-2xl backdrop-blur-md z-50 py-1.5 overflow-hidden fade-up">
+          <div className="px-3 py-1 text-[10px] uppercase font-bold tracking-wider text-[var(--text-muted)] border-b border-[var(--border-subtle)] flex items-center gap-1.5">
+            <Globe size={11} className="text-amber-500" />
             <span>Language / Idioma</span>
           </div>
 
@@ -54,7 +54,7 @@ export function LanguageSelector() {
                   className={`w-full text-left px-3 py-1.5 text-xs flex items-center justify-between transition-colors ${
                     isActive
                       ? 'bg-amber-400 text-black font-extrabold shadow-sm'
-                      : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                      : 'text-[var(--text-secondary)] hover:bg-[var(--bg-raised)] hover:text-[var(--text-primary)]'
                   }`}
                 >
                   <div className="flex items-center gap-2">

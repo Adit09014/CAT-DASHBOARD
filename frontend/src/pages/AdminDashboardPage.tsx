@@ -26,6 +26,7 @@ import { AnomalySentinelPanel } from '../components/AnomalySentinelPanel';
 import { TimeEstimationPanel } from '../components/TimeEstimationPanel';
 import { useLanguage } from '../services/i18n';
 import { LanguageSelector } from '../components/LanguageSelector';
+import { ThemeToggle } from '../components/ThemeToggle';
 
 type AdminTab = 'overview' | 'duration' | 'sentinel' | 'dispatch' | 'fleet' | 'operators' | 'tasks' | 'safety';
 
@@ -128,6 +129,7 @@ export function AdminDashboardPage() {
           </button>
           
           <LanguageSelector />
+          <ThemeToggle />
 
           <button onClick={() => logout()} className="btn btn-ghost" title={t('sign_out', 'Sign Out')}>
             <LogOut size={13} />
