@@ -39,6 +39,8 @@ class RadarTarget(BaseModel):
     closest_approach_meters: float
     risk_level: str
     zone: str
+    elevation_meters: float = 0.0
+    dimensions: list[float] = Field(default_factory=lambda: [1.0, 1.0, 1.8])
     trajectory: list[dict[str, Any]] = Field(default_factory=list)
 
 

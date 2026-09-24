@@ -15,16 +15,22 @@ import {
   Radio,
   Sliders,
   CheckCircle2,
-  Volume2
+  Volume2,
+  Rotate3d,
+  Layers
 } from 'lucide-react';
 import { api } from '../services/api';
 import { StatusBadge } from './StatusBadge';
+import { Radar3DView, RadarTarget3D, TargetTrajectoryPoint3D } from './Radar3DView';
+import { useTheme } from '../services/theme';
 
 interface TargetTrajectoryPoint {
   second: number;
   x_rel: number;
   y_rel: number;
+  z_rel?: number;
   distance_meters: number;
+  distance_3d?: number;
   bearing_degrees: number;
   is_conflict: boolean;
 }
@@ -35,6 +41,8 @@ interface RadarTarget {
   target_type: 'PEDESTRIAN' | 'HAUL_TRUCK' | 'LIGHT_VEHICLE' | 'HEAVY_VEHICLE' | 'GEO_HAZARD' | string;
   distance_meters: number;
   bearing_degrees: number;
+  elevation_meters?: number;
+  dimensions?: [number, number, number];
   relative_speed_mps: number;
   heading_degrees: number;
   ttc_seconds: number | null;
@@ -64,6 +72,9 @@ interface PredictiveSafetyMapProps {
 }
 
 export function PredictiveSafetyMap({ taskId = 1, operatorName, machineCode }: PredictiveSafetyMapProps) {
+  const { theme } = useTheme();
+  const isLight = theme === 'light';
+  const [viewMode, setViewMode] = useState<'3d' | '2d'>('3d');
   const [scenario, setScenario] = useState<string>('pedestrian');
   const [horizon, setHorizon] = useState<number>(30);
   const [threshold, setThreshold] = useState<number>(8.0);
@@ -119,27 +130,37 @@ export function PredictiveSafetyMap({ taskId = 1, operatorName, machineCode }: P
     return () => clearInterval(interval);
   }, [isPlaying, horizon]);
 
-  // Derived current state at currentTime
-  const currentTargets = (sim?.radar_targets || []).map((target) => {
+  // Derived current state at currentTime (typed as RadarTarget3D)
+  const currentTargets: RadarTarget3D[] = (sim?.radar_targets || []).map((target) => {
+    const elev = target.elevation_meters ?? 0;
     if (currentTime === 0 || !target.trajectory || target.trajectory.length === 0) {
       const r = target.distance_meters;
       const rad = (target.bearing_degrees * Math.PI) / 180;
+      const x = r * Math.sin(rad);
+      const y = r * Math.cos(rad);
       return {
         ...target,
-        curr_x: r * Math.sin(rad),
-        curr_y: r * Math.cos(rad),
+        elevation_meters: elev,
+        curr_x: x,
+        curr_y: y,
+        curr_z: elev,
         curr_dist: target.distance_meters,
+        curr_dist_3d: Math.sqrt(r * r + elev * elev),
         curr_bearing: target.bearing_degrees,
         in_conflict: target.distance_meters <= threshold,
       };
     }
 
     const pt = target.trajectory[Math.min(currentTime - 1, target.trajectory.length - 1)];
+    const pt_z = pt.z_rel ?? elev;
     return {
       ...target,
+      elevation_meters: elev,
       curr_x: pt.x_rel,
       curr_y: pt.y_rel,
+      curr_z: pt_z,
       curr_dist: pt.distance_meters,
+      curr_dist_3d: pt.distance_3d ?? Math.sqrt(pt.distance_meters * pt.distance_meters + pt_z * pt_z),
       curr_bearing: pt.bearing_degrees,
       in_conflict: pt.distance_meters <= threshold,
     };
@@ -225,6 +246,34 @@ export function PredictiveSafetyMap({ taskId = 1, operatorName, machineCode }: P
         </div>
 
         <div className="flex items-center gap-2">
+          {/* 3D vs 2D View Switcher */}
+          <div className="flex items-center p-0.5 rounded-lg bg-[var(--bg-base)] border border-[var(--border-subtle)]">
+            <button
+              type="button"
+              onClick={() => setViewMode('3d')}
+              className={`px-2.5 py-1 text-xs font-semibold rounded-md flex items-center gap-1.5 transition-all ${
+                viewMode === '3d'
+                  ? 'bg-[#ffcd11] text-black shadow-sm font-bold'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+              }`}
+            >
+              <Rotate3d size={13} />
+              <span>3D Radar</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('2d')}
+              className={`px-2.5 py-1 text-xs font-semibold rounded-md flex items-center gap-1.5 transition-all ${
+                viewMode === '2d'
+                  ? 'bg-[#ffcd11] text-black shadow-sm font-bold'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+              }`}
+            >
+              <Compass size={13} />
+              <span>2D PPI</span>
+            </button>
+          </div>
+
           <StatusBadge
             state={isAlarmTriggered ? 'red' : sim?.state === 'CRITICAL' ? 'red' : sim?.state === 'WARNING' ? 'amber' : 'green'}
             label={isAlarmTriggered ? 'CONFLICT' : `ZONE: ${sim?.state || 'CLEAR'}`}
@@ -307,18 +356,37 @@ export function PredictiveSafetyMap({ taskId = 1, operatorName, machineCode }: P
       {/* Radar Canvas & Target Telemetry Side-by-Side */}
       <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
 
-        {/* Left: The Circular Polar PPI Radar Canvas */}
-        <div className="card-raised flex flex-col items-center justify-center p-3 relative overflow-hidden bg-[#070b12] border border-[#1e293b]">
-          <div className="w-full flex items-center justify-between text-[11px] text-[var(--text-muted)] mb-2 px-1">
-            <span className="mono">PPI DISPLAY</span>
-            <span className="mono font-bold text-[var(--yellow)]">T = {currentTime}s / {horizon}s</span>
+        {/* Left: 3D Volumetric LiDAR or 2D Polar PPI Radar Canvas */}
+        {viewMode === '3d' ? (
+          <div className="flex flex-col w-full min-w-0">
+            <Radar3DView
+              targets={currentTargets}
+              currentTime={currentTime}
+              horizon={horizon}
+              threshold={threshold}
+              selectedTargetId={selectedTargetId}
+              onSelectTarget={(id) => setSelectedTargetId(id)}
+              isAlarmTriggered={isAlarmTriggered}
+            />
           </div>
+        ) : (
+          <div className={`card-raised flex flex-col items-center justify-center p-3 relative overflow-hidden transition-colors ${
+            isLight ? 'bg-[#f8fafc] border-slate-300' : 'bg-[#151f30] border-[#2a3c57]'
+          }`}>
+            <div className={`w-full flex items-center justify-between text-[11px] mb-2 px-1 ${
+              isLight ? 'text-slate-600' : 'text-slate-300'
+            }`}>
+              <span className="mono font-semibold">PPI RADAR DISPLAY</span>
+              <span className={`mono font-bold ${isLight ? 'text-[#ca8a04]' : 'text-[#ffcd11]'}`}>
+                T = {currentTime}s / {horizon}s
+              </span>
+            </div>
 
-          <div className="relative w-full max-w-[400px] aspect-square flex items-center justify-center">
+            <div className="relative w-full max-w-[400px] aspect-square flex items-center justify-center">
             <svg
               viewBox="0 0 400 400"
               className="w-full h-full select-none"
-              style={{ filter: 'drop-shadow(0 0 16px rgba(0,0,0,0.8))' }}
+              style={{ filter: isLight ? 'drop-shadow(0 2px 10px rgba(0,0,0,0.06))' : 'drop-shadow(0 4px 16px rgba(0,0,0,0.5))' }}
             >
               <defs>
                 {/* Radar sweep beam gradient */}
@@ -335,8 +403,15 @@ export function PredictiveSafetyMap({ taskId = 1, operatorName, machineCode }: P
                 </radialGradient>
               </defs>
 
-              {/* Background dark radar circle */}
-              <circle cx={cx} cy={cy} r={radarRadiusPx} fill="#05080e" stroke="#1e293b" strokeWidth="2" />
+              {/* Background radar circle (lightened for both light and dark modes) */}
+              <circle
+                cx={cx}
+                cy={cy}
+                r={radarRadiusPx}
+                fill={isLight ? '#f1f5f9' : '#1c283c'}
+                stroke={isLight ? '#cbd5e1' : '#2e425f'}
+                strokeWidth="2"
+              />
 
               {/* Concentric Range Rings */}
               {rangeRings.map((ringMeters) => {
@@ -349,14 +424,14 @@ export function PredictiveSafetyMap({ taskId = 1, operatorName, machineCode }: P
                       cy={cy}
                       r={rPx}
                       fill="none"
-                      stroke={isThresholdRing ? 'rgba(239, 68, 68, 0.35)' : 'rgba(51, 65, 85, 0.45)'}
+                      stroke={isThresholdRing ? 'rgba(239, 68, 68, 0.85)' : (isLight ? 'rgba(71, 85, 105, 0.35)' : 'rgba(111, 137, 176, 0.45)')}
                       strokeWidth={isThresholdRing ? '1.5' : '1'}
                       strokeDasharray={isThresholdRing ? '4 3' : 'none'}
                     />
                     <text
                       x={cx + 4}
                       y={cy - rPx + 11}
-                      fill={isThresholdRing ? '#ef4444' : '#64748b'}
+                      fill={isThresholdRing ? '#ef4444' : (isLight ? '#475569' : '#94a3b8')}
                       fontSize="9"
                       fontFamily="monospace"
                       fontWeight="bold"
@@ -368,8 +443,22 @@ export function PredictiveSafetyMap({ taskId = 1, operatorName, machineCode }: P
               })}
 
               {/* Azimuth crosshairs */}
-              <line x1={cx - radarRadiusPx} y1={cy} x2={cx + radarRadiusPx} y2={cy} stroke="rgba(51, 65, 85, 0.3)" strokeWidth="1" />
-              <line x1={cx} y1={cy - radarRadiusPx} x2={cx} y2={cy + radarRadiusPx} stroke="rgba(51, 65, 85, 0.3)" strokeWidth="1" />
+              <line
+                x1={cx - radarRadiusPx}
+                y1={cy}
+                x2={cx + radarRadiusPx}
+                y2={cy}
+                stroke={isLight ? 'rgba(100, 116, 139, 0.25)' : 'rgba(111, 137, 176, 0.3)'}
+                strokeWidth="1"
+              />
+              <line
+                x1={cx}
+                y1={cy - radarRadiusPx}
+                x2={cx}
+                y2={cy + radarRadiusPx}
+                stroke={isLight ? 'rgba(100, 116, 139, 0.25)' : 'rgba(111, 137, 176, 0.3)'}
+                strokeWidth="1"
+              />
 
               {/* Diagonal crosshairs */}
               <line
@@ -377,7 +466,7 @@ export function PredictiveSafetyMap({ taskId = 1, operatorName, machineCode }: P
                 y1={cy - radarRadiusPx * 0.707}
                 x2={cx + radarRadiusPx * 0.707}
                 y2={cy + radarRadiusPx * 0.707}
-                stroke="rgba(51, 65, 85, 0.15)"
+                stroke={isLight ? 'rgba(100, 116, 139, 0.15)' : 'rgba(111, 137, 176, 0.2)'}
                 strokeDasharray="2 4"
               />
               <line
@@ -385,20 +474,20 @@ export function PredictiveSafetyMap({ taskId = 1, operatorName, machineCode }: P
                 y1={cy + radarRadiusPx * 0.707}
                 x2={cx + radarRadiusPx * 0.707}
                 y2={cy - radarRadiusPx * 0.707}
-                stroke="rgba(51, 65, 85, 0.15)"
+                stroke={isLight ? 'rgba(100, 116, 139, 0.15)' : 'rgba(111, 137, 176, 0.2)'}
                 strokeDasharray="2 4"
               />
 
               {/* Degree / Orientation Markers */}
-              <text x={cx} y={cy - radarRadiusPx + 14} textAnchor="middle" fill="#f59e0b" fontSize="10" fontWeight="bold">0° FRONT</text>
-              <text x={cx + radarRadiusPx - 8} y={cy + 3} textAnchor="end" fill="#94a3b8" fontSize="9">90° RIGHT</text>
-              <text x={cx} y={cy + radarRadiusPx - 6} textAnchor="middle" fill="#94a3b8" fontSize="9">180° REAR</text>
-              <text x={cx - radarRadiusPx + 8} y={cy + 3} textAnchor="start" fill="#94a3b8" fontSize="9">270° LEFT</text>
+              <text x={cx} y={cy - radarRadiusPx + 14} textAnchor="middle" fill={isLight ? '#ca8a04' : '#ffcd11'} fontSize="10" fontWeight="bold">0° FRONT</text>
+              <text x={cx + radarRadiusPx - 8} y={cy + 3} textAnchor="end" fill={isLight ? '#64748b' : '#94a3b8'} fontSize="9">90° RIGHT</text>
+              <text x={cx} y={cy + radarRadiusPx - 6} textAnchor="middle" fill={isLight ? '#64748b' : '#94a3b8'} fontSize="9">180° REAR</text>
+              <text x={cx - radarRadiusPx + 8} y={cy + 3} textAnchor="start" fill={isLight ? '#64748b' : '#94a3b8'} fontSize="9">270° LEFT</text>
 
               {/* Blind Spot Shaded Sector (Right rear quarter 90° - 150°) */}
               <path
                 d={`M ${cx} ${cy} L ${cx + radarRadiusPx} ${cy} A ${radarRadiusPx} ${radarRadiusPx} 0 0 1 ${cx + radarRadiusPx * 0.5} ${cy + radarRadiusPx * 0.866} Z`}
-                fill="rgba(239, 68, 68, 0.06)"
+                fill={isLight ? 'rgba(239, 68, 68, 0.12)' : 'rgba(239, 68, 68, 0.08)'}
               />
 
               {/* Rotating Radar Sweep Line & Cone */}
@@ -407,17 +496,17 @@ export function PredictiveSafetyMap({ taskId = 1, operatorName, machineCode }: P
                   d={`M ${cx} ${cy} L ${cx} ${cy - radarRadiusPx} A ${radarRadiusPx} ${radarRadiusPx} 0 0 1 ${cx + radarRadiusPx * 0.38} ${cy - radarRadiusPx * 0.92} Z`}
                   fill="url(#radarSweepGlow)"
                 />
-                <line x1={cx} y1={cy} x2={cx} y2={cy - radarRadiusPx} stroke="rgba(34, 197, 94, 0.8)" strokeWidth="1.5" />
+                <line x1={cx} y1={cy} x2={cx} y2={cy - radarRadiusPx} stroke="rgba(34, 197, 94, 0.85)" strokeWidth="1.5" />
               </g>
 
               {/* Central Machine Indicator (Excavator / Cab icon) */}
               <g>
-                <circle cx={cx} cy={cy} r="14" fill="#1e293b" stroke="#f59e0b" strokeWidth="2" />
+                <circle cx={cx} cy={cy} r="14" fill={isLight ? '#ffffff' : '#24344d'} stroke={isLight ? '#ca8a04' : '#ffcd11'} strokeWidth="2" />
                 {/* Machine Boom indicator pointing up towards 0° */}
-                <line x1={cx} y1={cy - 4} x2={cx} y2={cy - 20} stroke="#f59e0b" strokeWidth="3" strokeLinecap="round" />
+                <line x1={cx} y1={cy - 4} x2={cx} y2={cy - 20} stroke={isLight ? '#ca8a04' : '#ffcd11'} strokeWidth="3" strokeLinecap="round" />
                 {/* Cab silhouette dot */}
-                <circle cx={cx - 3} cy={cy - 1} r="2.5" fill="#f59e0b" />
-                <rect x={cx - 7} y={cy - 6} width="14" height="12" rx="3" fill="none" stroke="#f59e0b" strokeWidth="1.2" />
+                <circle cx={cx - 3} cy={cy - 1} r="2.5" fill={isLight ? '#ca8a04' : '#ffcd11'} />
+                <rect x={cx - 7} y={cy - 6} width="14" height="12" rx="3" fill="none" stroke={isLight ? '#ca8a04' : '#ffcd11'} strokeWidth="1.2" />
               </g>
 
               {/* Active Radar Target Blips */}
@@ -539,7 +628,9 @@ export function PredictiveSafetyMap({ taskId = 1, operatorName, machineCode }: P
           </div>
 
           {/* Radar Legend and Compass Orientation Info */}
-          <div className="w-full flex items-center justify-between text-[11px] text-[var(--text-muted)] mt-2 pt-2 border-t border-[#1e293b]">
+          <div className={`w-full flex items-center justify-between text-[11px] mt-2 pt-2 border-t ${
+            isLight ? 'border-slate-200 text-slate-600' : 'border-[#2a3c57] text-slate-300'
+          }`}>
             <div className="flex items-center gap-3">
               <span className="flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-[var(--red)]" /> Conflict (&lt;8m)
@@ -554,6 +645,7 @@ export function PredictiveSafetyMap({ taskId = 1, operatorName, machineCode }: P
             <span className="mono text-[10px]">RED ARC = BLIND SPOT</span>
           </div>
         </div>
+        )}
 
         {/* Right: Target Inspection HUD & Selected Target Telemetry */}
         <div className="flex flex-col justify-between space-y-4">
@@ -589,9 +681,16 @@ export function PredictiveSafetyMap({ taskId = 1, operatorName, machineCode }: P
 
                 <div className="grid grid-cols-2 gap-2 text-xs pt-1">
                   <div className="p-2 rounded-md bg-[var(--bg-base)] border border-[var(--border-subtle)]">
-                    <div className="text-[10px] text-[var(--text-muted)]">Current Distance</div>
+                    <div className="text-[10px] text-[var(--text-muted)]">2D Ground Range</div>
                     <div className="text-base font-bold mono text-[var(--text-primary)] mt-0.5">
                       {selectedTarget.curr_dist.toFixed(1)} m
+                    </div>
+                  </div>
+
+                  <div className="p-2 rounded-md bg-[var(--bg-base)] border border-[var(--border-subtle)]">
+                    <div className="text-[10px] text-[var(--text-muted)]">3D Spatial Distance</div>
+                    <div className="text-base font-bold mono text-[#ffcd11] mt-0.5">
+                      {(selectedTarget.curr_dist_3d ?? Math.sqrt(selectedTarget.curr_dist * selectedTarget.curr_dist + (selectedTarget.elevation_meters ?? 0) * (selectedTarget.elevation_meters ?? 0))).toFixed(1)} m
                     </div>
                   </div>
 
@@ -599,6 +698,13 @@ export function PredictiveSafetyMap({ taskId = 1, operatorName, machineCode }: P
                     <div className="text-[10px] text-[var(--text-muted)]">Bearing Azimuth</div>
                     <div className="text-base font-bold mono text-[var(--text-primary)] mt-0.5">
                       {selectedTarget.curr_bearing.toFixed(0)}°
+                    </div>
+                  </div>
+
+                  <div className="p-2 rounded-md bg-[var(--bg-base)] border border-[var(--border-subtle)]">
+                    <div className="text-[10px] text-[var(--text-muted)]">Elevation (Z-axis)</div>
+                    <div className={`text-base font-bold mono mt-0.5 ${(selectedTarget.elevation_meters ?? 0) < 0 ? 'text-[var(--blue)]' : (selectedTarget.elevation_meters ?? 0) > 0 ? 'text-[#ffcd11]' : 'text-[var(--text-primary)]'}`}>
+                      {(selectedTarget.elevation_meters ?? 0) > 0 ? '+' : ''}{(selectedTarget.elevation_meters ?? 0).toFixed(1)} m
                     </div>
                   </div>
 

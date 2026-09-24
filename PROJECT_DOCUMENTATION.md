@@ -57,6 +57,7 @@ flowchart TD
 - **Routing**: React Router DOM v7.
 - **Server State & Data Fetching**: TanStack React Query v5 (`@tanstack/react-query`) with automatic polling, background refetching, and optimistic updates.
 - **Data Visualization & Charting**: Recharts v2 (Responsive Container, AreaChart, LineChart, ComposedChart, BarChart, XAxis, YAxis, Tooltip, CartesianGrid).
+- **3D Graphics & Spatial LiDAR Engine**: Three.js (`three`, `@types/three`) for interactive 3D volumetric radar rendering, procedural Caterpillar excavator models, spatial trajectory ribbons, and orbital camera mechanics.
 - **UI Icons**: Lucide React (`lucide-react`) with 60+ contextual industrial icons.
 - **Audio & Speech Synthesis**: Native HTML5 Web Speech API (`window.speechSynthesis`, `SpeechSynthesisUtterance`) for offline in-cab voice briefings.
 - **Theme Architecture (Dark & Light Mode)**: Dual-palette CSS custom properties design system with `ThemeProvider` (`theme.tsx`), persistent storage in `localStorage`, and animated Sun/Moon toggle (`ThemeToggle.tsx`).
@@ -152,13 +153,36 @@ flowchart TD
 - **Comparative Multi-Parameter Overlay**: Dual-axis graph correlating hydraulic pressure surges against machine ground speed to isolate operator lugging or implement stalling.
 - **Telemetry Stream Scrubbing**: Slider to rewind and inspect historical machine state leading up to any specific safety incident.
 
-### 6. In-Cab Domain-Guarded AI Copilot (`CopilotPanel.tsx`)
+### 6. Interactive 3D Volumetric Proximity Radar & LiDAR Engine (`Radar3DView.tsx`, `PredictiveSafetyMap.tsx`)
+- **Three.js WebGL Spatial Canvas**: Full 3D Cartesian coordinates ($X$ lateral, $Y$ vertical elevation, $Z$ longitudinal) with soft shadows and dynamic lighting.
+- **Procedural 3D Caterpillar Excavator**:
+  - Authentic dual crawler tracks in dark metallic charcoal.
+  - Carbody house in Caterpillar Yellow (`#ffcd11`) with rear counterweight.
+  - Operator cabin with ROPS safety roof and animated amber/red safety strobe beacon.
+  - Articulated boom, stick, chrome hydraulic cylinders, and heavy-duty digging bucket.
+- **3D LiDAR Radar Sweep & Blind Spot Cone**:
+  - Continuous 360° volumetric sweep wedge with green translucent LiDAR beam.
+  - Right-rear blind-spot hazard sector (90° to 150°) rendered as a red-tinted 3D spatial cone.
+- **3D Targets with Elevation Drop Stalks**:
+  - Vertical glowing stalks connecting elevated/sunken targets to ground footprint rings.
+  - Target-specific 3D geometry: High-vis pedestrian workers with hardhats, 797F haul trucks, pickup trucks, and trench drop-off hazards.
+  - 30-second predictive trajectory ribbons color-coded by collision risk level.
+- **Tactical Multi-Angle Camera Presets**:
+  - **Tactical 3D**: Elevated isometric orbit view (48m radius, 45° angle) for comprehensive situational awareness.
+  - **In-Cab POV**: Puts the operator right inside the excavator cab looking forward and toward the right-hand blind spot.
+  - **Top-Down Ortho**: True 90° overhead radar projection.
+  - **Side Elevation**: Highlights relative height variations and trench drop depths.
+  - **Focus Target**: Automatically tracks and centers on the currently active hazard.
+- **Seamless 3D / 2D PPI Toggle Switch**: Real-time mode switching between 3D volumetric view and traditional 2D polar PPI radar.
+- **Enhanced Telemetry HUD**: Simultaneous 2D Ground Range, 3D Spatial Distance (Euclidean metric), and Z-axis Elevation readings.
+
+### 7. In-Cab Domain-Guarded AI Copilot (`CopilotPanel.tsx`)
 - **Industrial RAG Prompt Architecture**: Grounded in Caterpillar Operation & Maintenance Manuals (OMM), ISO 3471 (ROPS), and OSHA 1926 regulations.
 - **Strict Out-of-Domain Guardrails**: Rejects non-operational queries (e.g. general trivia, coding, finance) and enforces strict adherence to safe machinery protocols.
 - **Push-to-Talk Voice Input Simulation**: Allows operators to speak instructions or query warnings hands-free while operating joysticks.
 - **Context-Aware Safety Cards**: Automatically injects current telemetry, active DTC diagnostic trouble codes, and weather into prompt generation.
 
-### 7. Global Multilingual System (`i18n.tsx`, `LanguageSelector.tsx`)
+### 8. Global Multilingual System (`i18n.tsx`, `LanguageSelector.tsx`)
 - **7 Fully Supported Languages**:
   - 🇺🇸 English (`en`)
   - 🇪🇸 Spanish (`es`)
@@ -169,24 +193,24 @@ flowchart TD
   - 🇧🇷 Portuguese (`pt`)
 - **Comprehensive Localization**: Covers 100% of application strings: sidebar navigation, metric badges, telemetry charts, weather forecasts, XAI alert narratives, SOP checklist action items, and Text-to-Speech audio briefings.
 
-### 8. Live Weather & Environmental Intelligence (`FullDayWeatherCard.tsx`)
+### 9. Live Weather & Environmental Intelligence (`FullDayWeatherCard.tsx`)
 - **Live Open-Meteo Integration**: Automated GPS coordination sync with Vellore, Tamil Nadu (or configured quarry location).
 - **24-Hour Hourly Trajectory**: Visual hourly temperature curves, precipitation probabilities (%), and wind speeds (km/h).
 - **Safety Hazard Weather Index**: Automatic hazard alerts for heavy rain, wet mud conditions, and reduced visibility affecting braking and slope stability.
 - **Deterministic Offline Fallback**: Guarantees zero UI breakage when operating off-grid without internet connectivity.
 
-### 9. Domain Guard Training & Upskilling (`DomainGuardTraining.tsx`)
+### 10. Domain Guard Training & Upskilling (`DomainGuardTraining.tsx`)
 - **Targeted Micro-Learning**: Recommends training modules based on active operator telemetry anomalies (e.g., Idle Time Optimization, Anti-Rollover Incline Handling, Blind-Spot Awareness).
 - **Curated Media Playback**: Embedded educational YouTube tutorials and CAT technical briefs.
 - **Empirical Before/After Metrics**: Quantifies operator performance improvement (e.g., *Idle time reduced from 34% to 24% after completing training module*).
 
-### 10. Admin Fleet Oversight & Governance (`AdminDashboardPage.tsx`)
+### 11. Admin Fleet Oversight & Governance (`AdminDashboardPage.tsx`)
 - **Fleet Telematics Overview**: High-level status of all machines in the sector (Operating, Idle, Maintenance, Tripped).
 - **Operator Baseline Management**: Fleet-wide benchmarking of fuel efficiency, average duration, and safety incidents.
 - **Audit Logging Ledger**: Comprehensive compliance tracking recording every alarm trigger, acknowledgment, training completion, and parameter override.
 - **Demo State Reset**: Instant one-click database re-seeding tool for executive demonstrations and training walkthroughs.
 
-### 11. Adaptive Dark & Light Industrial Theme System (`theme.tsx`, `ThemeToggle.tsx`, `styles.css`)
+### 12. Adaptive Dark & Light Industrial Theme System (`theme.tsx`, `ThemeToggle.tsx`, `styles.css`)
 - **Dual-Palette Ergonomics**:
   - **Dark Obsidian Mode**: Designed for low-glare nighttime cab operations, subterranean excavation, and high-contrast alert visualization (`#08090d` base, `#0d1117` surface, `#f5a623` CAT yellow highlights).
   - **Light Site Mode**: Engineered for direct sunlight and open-quarry daylight conditions (`#f1f5f9` slate base, `#ffffff` crisp white cards, high-contrast `#d97706` amber accents, and `#0f172a` deep slate typography).

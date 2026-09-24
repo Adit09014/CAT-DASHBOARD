@@ -2186,6 +2186,28 @@ def simulate_proximity(
         speed = float(item["speed"])
         heading_rel_deg = float(item["heading"])
 
+        # Determine 3D elevation and bounding dimensions
+        t_type = item["target_type"]
+        t_name = item.get("name", "").lower()
+        if t_type == "PEDESTRIAN":
+            z0 = 0.0
+            dims = [0.6, 0.6, 1.8]
+        elif t_type == "LIGHT_VEHICLE":
+            z0 = 0.0
+            dims = [2.1, 5.2, 1.9]
+        elif t_type == "HAUL_TRUCK":
+            z0 = 0.0
+            dims = [5.5, 9.8, 4.4]
+        elif t_type == "HEAVY_VEHICLE":
+            z0 = 0.0
+            dims = [4.2, 7.5, 3.8]
+        elif t_type == "GEO_HAZARD":
+            z0 = 1.8 if "berm" in t_name or "stockpile" in t_name else -2.5
+            dims = [4.0, 8.0, abs(z0) if abs(z0) > 0.5 else 2.0]
+        else:
+            z0 = 0.0
+            dims = [1.0, 1.0, 1.5]
+
         # Convert polar to Cartesian relative to machine (machine at 0,0 heading 0°)
         x0 = r0 * sin(radians(theta0_deg))
         y0 = r0 * cos(radians(theta0_deg))
@@ -2201,12 +2223,14 @@ def simulate_proximity(
         for sec in range(1, horizon_seconds + 1):
             xt = x0 + vx * sec
             yt = y0 + vy * sec
-            dist = sqrt(xt * xt + yt * yt)
+            zt = z0  # ground/elevation level
+            dist_2d = sqrt(xt * xt + yt * yt)
+            dist_3d = sqrt(xt * xt + yt * yt + zt * zt)
             bearing_rad = atan2(xt, yt)
             bearing_deg = (degrees(bearing_rad) + 360.0) % 360.0
 
-            min_target_dist = min(min_target_dist, dist)
-            is_conflict = dist <= threshold_meters
+            min_target_dist = min(min_target_dist, dist_2d)
+            is_conflict = dist_2d <= threshold_meters
 
             if is_conflict and target_conflict_sec is None:
                 target_conflict_sec = sec
@@ -2215,7 +2239,9 @@ def simulate_proximity(
                 "second": sec,
                 "x_rel": round(xt, 2),
                 "y_rel": round(yt, 2),
-                "distance_meters": round(dist, 2),
+                "z_rel": round(zt, 2),
+                "distance_meters": round(dist_2d, 2),
+                "distance_3d": round(dist_3d, 2),
                 "bearing_degrees": round(bearing_deg, 1),
                 "is_conflict": is_conflict,
             })
@@ -2256,6 +2282,8 @@ def simulate_proximity(
             "target_type": item["target_type"],
             "distance_meters": round(r0, 1),
             "bearing_degrees": round(theta0_deg, 1),
+            "elevation_meters": round(z0, 2),
+            "dimensions": dims,
             "relative_speed_mps": round(speed, 1),
             "heading_degrees": round(heading_rel_deg, 1),
             "ttc_seconds": round(float(ttc), 1) if ttc is not None else None,
