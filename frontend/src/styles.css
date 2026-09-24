@@ -2,74 +2,95 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ─── Design Tokens ─── */
+/* ════════════════════════════════════════════════════════════════ */
+/* ─── Caterpillar Industrial Design Tokens ─────────────────────── */
+/* ════════════════════════════════════════════════════════════════ */
+
 :root,
 [data-theme="dark"] {
   color-scheme: dark;
-  --bg-base:        #08090d;
-  --bg-surface:     #0d1117;
-  --bg-raised:      #131920;
-  --bg-elevated:    #1a2230;
-  --border-subtle:  rgba(255, 255, 255, 0.06);
-  --border-default: rgba(255, 255, 255, 0.10);
-  --border-strong:  rgba(255, 255, 255, 0.18);
-  --yellow:         #f5a623;
-  --cat-yellow:     #f5a623;
-  --accent-yellow:  #f5a623;
-  --yellow-dim:     rgba(245, 166, 35, 0.12);
-  --yellow-border:  rgba(245, 166, 35, 0.30);
+  --bg-base:        #0a0d12;
+  --bg-surface:     #12161f;
+  --bg-raised:      #1a202c;
+  --bg-elevated:    #242c3d;
+  --border-subtle:  rgba(255, 255, 255, 0.08);
+  --border-default: rgba(255, 255, 255, 0.14);
+  --border-strong:  rgba(255, 255, 255, 0.24);
+
+  /* Caterpillar Signature Yellow */
+  --yellow:         #ffcd11;
+  --cat-yellow:     #ffcd11;
+  --accent-yellow:  #ffcd11;
+  --yellow-dim:     rgba(255, 205, 17, 0.14);
+  --yellow-border:  rgba(255, 205, 17, 0.38);
+
+  /* Safety Alert Colors */
   --green:          #22c55e;
-  --green-dim:      rgba(34, 197, 94, 0.10);
-  --green-border:   rgba(34, 197, 94, 0.25);
+  --green-dim:      rgba(34, 197, 94, 0.14);
+  --green-border:   rgba(34, 197, 94, 0.35);
+  --green-surface:  rgba(34, 197, 94, 0.08);
   --red:            #ef4444;
-  --red-dim:        rgba(239, 68, 68, 0.10);
-  --red-border:     rgba(239, 68, 68, 0.25);
+  --red-dim:        rgba(239, 68, 68, 0.14);
+  --red-border:     rgba(239, 68, 68, 0.35);
+  --red-surface:    rgba(239, 68, 68, 0.08);
   --blue:           #3b82f6;
-  --blue-dim:       rgba(59, 130, 246, 0.10);
-  --blue-border:    rgba(59, 130, 246, 0.25);
-  --text-primary:   #f0f4f8;
-  --text-secondary: #8b9ab0;
-  --text-muted:     #52657a;
-  --text-brand:     #f5a623;
-  --navbar-bg:      rgba(8, 9, 13, 0.95);
+  --blue-dim:       rgba(59, 130, 246, 0.12);
+  --blue-border:    rgba(59, 130, 246, 0.35);
+
+  /* High Contrast Typography */
+  --text-primary:   #ffffff;
+  --text-secondary: #94a3b8;
+  --text-muted:     #64748b;
+  --text-brand:     #ffcd11;
+
+  --navbar-bg:      rgba(10, 13, 18, 0.95);
   --navbar-border:  rgba(255, 255, 255, 0.08);
-  --modal-bg:       rgba(13, 17, 23, 0.96);
+  --modal-bg:       rgba(18, 22, 31, 0.98);
   --card-shadow:    none;
-  --input-bg:       #0d1117;
+  --input-bg:       #12161f;
   font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
 }
 
 [data-theme="light"] {
   color-scheme: light;
-  --bg-base:        #f1f5f9;
+  --bg-base:        #f4f5f8;
   --bg-surface:     #ffffff;
-  --bg-raised:      #f8fafc;
-  --bg-elevated:    #e2e8f0;
-  --border-subtle:  rgba(15, 23, 42, 0.08);
-  --border-default: rgba(15, 23, 42, 0.14);
-  --border-strong:  rgba(15, 23, 42, 0.24);
-  --yellow:         #d97706;
-  --cat-yellow:     #d97706;
-  --accent-yellow:  #d97706;
-  --yellow-dim:     rgba(217, 119, 6, 0.12);
-  --yellow-border:  rgba(217, 119, 6, 0.32);
+  --bg-raised:      #f0f2f5;
+  --bg-elevated:    #e5e7eb;
+  --border-subtle:  rgba(0, 0, 0, 0.08);
+  --border-default: rgba(0, 0, 0, 0.14);
+  --border-strong:  rgba(0, 0, 0, 0.25);
+
+  /* Caterpillar Signature Yellow on Light (strong, rich industrial amber-yellow) */
+  --yellow:         #e59e00;
+  --cat-yellow:     #ffcd11;
+  --accent-yellow:  #e59e00;
+  --yellow-dim:     rgba(229, 158, 0, 0.12);
+  --yellow-border:  rgba(229, 158, 0, 0.38);
+
+  /* Safety Alert Colors on Light - crisp, vibrant, professional */
   --green:          #16a34a;
-  --green-dim:      rgba(22, 163, 74, 0.10);
-  --green-border:   rgba(22, 163, 74, 0.28);
+  --green-dim:      rgba(22, 163, 74, 0.12);
+  --green-border:   rgba(22, 163, 74, 0.35);
+  --green-surface:  #f0fdf4;
   --red:            #dc2626;
   --red-dim:        rgba(220, 38, 38, 0.10);
-  --red-border:     rgba(220, 38, 38, 0.28);
+  --red-border:     rgba(220, 38, 38, 0.35);
+  --red-surface:    #fef2f2;
   --blue:           #2563eb;
   --blue-dim:       rgba(37, 99, 235, 0.10);
-  --blue-border:    rgba(37, 99, 235, 0.28);
+  --blue-border:    rgba(37, 99, 235, 0.35);
+
+  /* Crisp Caterpillar High Contrast Typography (Deep Charcoal / Black) */
   --text-primary:   #0f172a;
   --text-secondary: #334155;
   --text-muted:     #64748b;
   --text-brand:     #b45309;
-  --navbar-bg:      rgba(255, 255, 255, 0.94);
-  --navbar-border:  rgba(15, 23, 42, 0.10);
-  --modal-bg:       rgba(255, 255, 255, 0.98);
-  --card-shadow:    0 1px 3px 0 rgba(0, 0, 0, 0.06), 0 1px 2px -1px rgba(0, 0, 0, 0.06);
+
+  --navbar-bg:      #ffffff;
+  --navbar-border:  rgba(0, 0, 0, 0.10);
+  --modal-bg:       #ffffff;
+  --card-shadow:    0 1px 3px 0 rgba(0, 0, 0, 0.06), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
   --input-bg:       #ffffff;
 }
 
@@ -79,7 +100,7 @@ html, body, #root {
   margin: 0;
   background-color: var(--bg-base);
   color: var(--text-primary);
-  transition: background-color 0.2s ease, color 0.2s ease;
+  transition: background-color 0.18s ease, color 0.18s ease;
 }
 
 body {
@@ -89,11 +110,16 @@ body {
 
 [data-theme="dark"] body,
 :root:not([data-theme="light"]) body {
-  background-image: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(245, 166, 35, 0.06), transparent), radial-gradient(ellipse 60% 40% at 80% 60%, rgba(59, 130, 246, 0.04), transparent);
+  background-image: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(255, 205, 17, 0.05), transparent), radial-gradient(ellipse 60% 40% at 80% 60%, rgba(59, 130, 246, 0.03), transparent);
 }
 
-[data-theme="light"] body {
-  background-image: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(217, 119, 6, 0.05), transparent), radial-gradient(ellipse 60% 40% at 80% 60%, rgba(37, 99, 235, 0.03), transparent);
+/* Light mode has NO dark gradients - pure, clean, bright background */
+[data-theme="light"],
+[data-theme="light"] html,
+[data-theme="light"] body,
+[data-theme="light"] #root {
+  background-image: none !important;
+  background-color: var(--bg-base) !important;
 }
 
 .mono { font-family: 'JetBrains Mono', 'Courier New', monospace; }
@@ -116,7 +142,7 @@ body {
   background: var(--navbar-bg);
   border-bottom: 1px solid var(--navbar-border);
   backdrop-filter: blur(20px);
-  transition: background 0.2s ease, border-color 0.2s ease;
+  transition: background 0.18s ease, border-color 0.18s ease;
 }
 .navbar-logo { display: flex; align-items: center; gap: 10px; }
 .navbar-badge {
@@ -129,10 +155,10 @@ body {
   background: var(--yellow);
   font-weight: 900;
   font-size: 0.6rem;
-  color: #1a0f00;
+  color: #111827;
   letter-spacing: 0.05em;
   flex-shrink: 0;
-  box-shadow: 0 2px 6px rgba(245, 166, 35, 0.3);
+  box-shadow: 0 2px 6px rgba(229, 158, 0, 0.35);
 }
 
 .sidebar {
@@ -144,12 +170,12 @@ body {
   flex-direction: column;
   justify-content: space-between;
   padding: 16px 12px;
-  transition: background-color 0.2s ease, border-color 0.2s ease;
+  transition: background-color 0.18s ease, border-color 0.18s ease;
 }
 .sidebar-section-label { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); padding: 0 8px; margin-bottom: 6px; }
 .nav-item { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid transparent; font-size: 0.78rem; font-weight: 500; color: var(--text-secondary); cursor: pointer; transition: all 0.12s ease; text-align: left; gap: 8px; }
 .nav-item:hover { background: var(--bg-raised); color: var(--text-primary); border-color: var(--border-subtle); }
-.nav-item.active { background: var(--yellow-dim); border-color: var(--yellow-border); color: var(--yellow); font-weight: 600; }
+.nav-item.active { background: var(--yellow-dim); border-color: var(--yellow-border); color: var(--yellow); font-weight: 700; }
 .nav-item-left { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
 
 .card { background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 16px; transition: border-color 0.15s ease, box-shadow 0.15s ease; box-shadow: var(--card-shadow); }
@@ -171,7 +197,7 @@ body {
 .chip-neutral { background: var(--bg-raised); border-color: var(--border-default); color: var(--text-secondary); }
 
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 14px; border-radius: 8px; font-size: 0.78rem; font-weight: 600; cursor: pointer; transition: all 0.12s ease; border: 1px solid; }
-.btn-primary { background: var(--yellow); border-color: var(--yellow); color: #160f00; font-weight: 700; }
+.btn-primary { background: var(--yellow); border-color: var(--yellow); color: #111827; font-weight: 700; }
 .btn-primary:hover { filter: brightness(1.08); }
 .btn-secondary { background: var(--bg-surface); border-color: var(--border-default); color: var(--text-secondary); }
 .btn-secondary:hover { border-color: var(--border-strong); color: var(--text-primary); background: var(--bg-raised); }
@@ -226,7 +252,7 @@ body {
   border: 1px solid var(--border-default);
   border-radius: 16px;
   padding: 32px;
-  box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.15), 0 0 20px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.12), 0 0 20px rgba(0, 0, 0, 0.04);
 }
 .vitals-panel { background: var(--bg-raised); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 12px; }
 .vitals-row { display: flex; align-items: center; justify-content: space-between; padding: 4px 0; }
@@ -254,7 +280,97 @@ body {
 @keyframes fade-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 .fade-up { animation: fade-up 0.2s ease both; }
 
-/* ─── Light Mode Contextual Overrides for Embedded Dark Utilities ─── */
+/* ════════════════════════════════════════════════════════════════ */
+/* ─── Caterpillar Status & Alert Banners ───────────────────────── */
+/* ════════════════════════════════════════════════════════════════ */
+
+.status-banner-critical {
+  background-color: var(--red-surface);
+  border: 1px solid var(--red-border);
+  box-shadow: 0 4px 18px -2px rgba(239, 68, 68, 0.20);
+}
+.status-banner-elevated {
+  background-color: var(--yellow-dim);
+  border: 1px solid var(--yellow-border);
+  box-shadow: 0 4px 18px -2px rgba(245, 166, 35, 0.18);
+}
+.status-banner-nominal {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+}
+.status-banner-safe {
+  background-color: var(--green-surface);
+  border: 1px solid var(--green-border);
+  box-shadow: 0 4px 18px -2px rgba(34, 197, 94, 0.18);
+}
+
+/* ════════════════════════════════════════════════════════════════ */
+/* ─── Light Mode Overrides (Eliminates All Black Gradients) ─────── */
+/* ════════════════════════════════════════════════════════════════ */
+
+/* Neutralize only dark gradient backgrounds in light mode */
+[data-theme="light"] [class*="from-black"],
+[data-theme="light"] [class*="to-black"],
+[data-theme="light"] [class*="via-black"],
+[data-theme="light"] [class*="from-slate-950"],
+[data-theme="light"] [class*="to-slate-950"],
+[data-theme="light"] [class*="from-zinc-950"],
+[data-theme="light"] [class*="to-zinc-950"],
+[data-theme="light"] [class*="from-yellow-950"],
+[data-theme="light"] [class*="to-yellow-950"],
+[data-theme="light"] [class*="from-amber-950"],
+[data-theme="light"] [class*="to-amber-950"],
+[data-theme="light"] [class*="from-rose-950"],
+[data-theme="light"] [class*="to-rose-950"],
+[data-theme="light"] [class*="from-red-950"],
+[data-theme="light"] [class*="to-red-950"] {
+  background-image: none !important;
+  background-color: var(--bg-surface) !important;
+}
+
+/* Modal backdrop in light mode: sleek blurred translucent overlay */
+[data-theme="light"] .fixed.inset-0[class*="bg-black"] {
+  background-color: rgba(15, 23, 42, 0.60) !important;
+}
+
+/* Convert all dark alert backgrounds (*-950) to clean, vibrant theme tints in light mode */
+[data-theme="light"] [class*="bg-rose-950"],
+[data-theme="light"] [class*="bg-red-950"] {
+  background-color: var(--red-surface) !important;
+}
+
+[data-theme="light"] [class*="bg-amber-950"],
+[data-theme="light"] [class*="bg-yellow-950"] {
+  background-color: var(--yellow-dim) !important;
+}
+
+[data-theme="light"] [class*="bg-emerald-950"],
+[data-theme="light"] [class*="bg-green-950"] {
+  background-color: var(--green-surface) !important;
+}
+
+[data-theme="light"] [class*="bg-blue-950"] {
+  background-color: var(--blue-dim) !important;
+}
+
+[data-theme="light"] [class*="bg-purple-950"] {
+  background-color: rgba(147, 51, 234, 0.10) !important;
+}
+
+/* Neutralize black shadow casts in light mode */
+[data-theme="light"] [class*="shadow-rose-950"] {
+  box-shadow: 0 4px 14px rgba(220, 38, 38, 0.15) !important;
+}
+[data-theme="light"] [class*="shadow-amber-950"] {
+  box-shadow: 0 4px 14px rgba(229, 158, 0, 0.15) !important;
+}
+[data-theme="light"] [class*="shadow-emerald-950"] {
+  box-shadow: 0 4px 14px rgba(22, 163, 74, 0.15) !important;
+}
+
+/* Replace transparent black surface fills with clean raised card surfaces in light mode */
+[data-theme="light"] .bg-black\/80,
+[data-theme="light"] .bg-black\/70,
 [data-theme="light"] .bg-black\/60,
 [data-theme="light"] .bg-black\/50,
 [data-theme="light"] .bg-black\/40,
@@ -292,6 +408,28 @@ body {
   border-color: var(--border-default) !important;
 }
 
+/* High contrast alert typography in light mode */
+[data-theme="light"] [class*="text-rose-300"],
+[data-theme="light"] [class*="text-rose-200"],
+[data-theme="light"] [class*="text-red-300"],
+[data-theme="light"] [class*="text-red-200"] {
+  color: var(--red) !important;
+}
+
+[data-theme="light"] [class*="text-amber-300"],
+[data-theme="light"] [class*="text-amber-200"],
+[data-theme="light"] [class*="text-yellow-300"],
+[data-theme="light"] [class*="text-yellow-200"] {
+  color: var(--yellow) !important;
+}
+
+[data-theme="light"] [class*="text-emerald-300"],
+[data-theme="light"] [class*="text-emerald-200"],
+[data-theme="light"] [class*="text-green-300"],
+[data-theme="light"] [class*="text-green-200"] {
+  color: var(--green) !important;
+}
+
 [data-theme="light"] .text-white {
   color: var(--text-primary) !important;
 }
@@ -305,10 +443,7 @@ body {
   color: var(--text-secondary) !important;
 }
 
-[data-theme="light"] .text-slate-400 {
-  color: var(--text-muted) !important;
-}
-
+[data-theme="light"] .text-slate-400,
 [data-theme="light"] .text-zinc-400 {
   color: var(--text-muted) !important;
 }
@@ -327,28 +462,28 @@ body {
 
 /* ─── Recharts Light Mode Styling ─── */
 [data-theme="light"] .recharts-cartesian-grid line {
-  stroke: rgba(15, 23, 42, 0.08) !important;
+  stroke: rgba(0, 0, 0, 0.08) !important;
 }
 
 [data-theme="light"] .recharts-default-tooltip {
   background-color: #ffffff !important;
-  border-color: rgba(15, 23, 42, 0.15) !important;
-  color: #0f172a !important;
+  border-color: rgba(0, 0, 0, 0.15) !important;
+  color: #111827 !important;
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12) !important;
   border-radius: 10px !important;
 }
 
 [data-theme="light"] .recharts-tooltip-item {
-  color: #0f172a !important;
+  color: #111827 !important;
 }
 
 [data-theme="light"] .recharts-tooltip-label {
-  color: #475569 !important;
+  color: #374151 !important;
   font-weight: 600 !important;
 }
 
 [data-theme="light"] .recharts-legend-item-text {
-  color: #334155 !important;
+  color: #374151 !important;
   font-weight: 500 !important;
 }
 

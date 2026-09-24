@@ -195,8 +195,8 @@ export function TelemetryChart({
 
         <div className="flex flex-wrap items-center gap-2">
           {/* Live Status Pill */}
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-950/40 border border-emerald-500/30 text-emerald-400 text-xs font-mono">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--green-dim)] border border-[var(--green-border)] text-[var(--green)] text-xs font-mono">
+            <span className="w-2 h-2 rounded-full bg-[var(--green)] animate-ping" />
             <Radio size={13} />
             <span>{t('live_iot')}</span>
           </div>
@@ -335,13 +335,13 @@ export function TelemetryChart({
 
           <div className="flex flex-wrap items-center gap-2">
             {/* Metric Switcher Tabs */}
-            <div className="flex items-center bg-black/50 border border-white/10 rounded-lg p-1 text-xs">
+            <div className="flex items-center bg-[var(--bg-raised)] border border-[var(--border-default)] rounded-lg p-1 text-xs">
               <button
                 onClick={() => setMetricTab('load-fuel')}
                 className={`px-2.5 py-1 rounded-md transition-all font-medium ${
                   metricTab === 'load-fuel'
-                    ? 'bg-amber-400 text-black font-extrabold shadow-sm'
-                    : 'text-zinc-400 hover:text-white'
+                    ? 'bg-[var(--yellow)] text-slate-950 font-bold shadow-sm'
+                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
                 }`}
               >
                 {t('metric_engine_fuel', 'Engine & Fuel Flow')}
@@ -350,8 +350,8 @@ export function TelemetryChart({
                 onClick={() => setMetricTab('speed-payload')}
                 className={`px-2.5 py-1 rounded-md transition-all font-medium ${
                   metricTab === 'speed-payload'
-                    ? 'bg-amber-400 text-black font-extrabold shadow-sm'
-                    : 'text-zinc-400 hover:text-white'
+                    ? 'bg-[var(--yellow)] text-slate-950 font-bold shadow-sm'
+                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
                 }`}
               >
                 {t('metric_speed_payload', 'Speed & Payload')}
@@ -360,8 +360,8 @@ export function TelemetryChart({
                 onClick={() => setMetricTab('hydraulic-thermal')}
                 className={`px-2.5 py-1 rounded-md transition-all font-medium ${
                   metricTab === 'hydraulic-thermal'
-                    ? 'bg-amber-400 text-black font-extrabold shadow-sm'
-                    : 'text-zinc-400 hover:text-white'
+                    ? 'bg-[var(--yellow)] text-slate-950 font-bold shadow-sm'
+                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
                 }`}
               >
                 {t('metric_hydraulics_thermals', 'Hydraulics & Thermals')}
@@ -369,7 +369,7 @@ export function TelemetryChart({
             </div>
 
             {/* Time Window Switcher */}
-            <div className="flex items-center bg-black/40 border border-white/5 rounded-lg p-0.5 text-xs text-slate-400">
+            <div className="flex items-center bg-[var(--bg-raised)] border border-[var(--border-subtle)] rounded-lg p-0.5 text-xs text-[var(--text-muted)]">
               {(['15m', '30m', '60m'] as const).map((r) => (
                 <button
                   key={r}
@@ -490,9 +490,9 @@ export function TelemetryChart({
               </div>
 
               {/* Pitch Target Indicator Center */}
-              <div className="relative z-10 bg-black/80 px-2 py-1 rounded border border-amber-400 text-center font-mono shadow-lg">
-                <div className="text-xs font-bold text-amber-400">{tiltDeg.toFixed(1)}° ROLL</div>
-                <div className="text-[10px] text-slate-300">{slopeDeg.toFixed(1)}° PITCH</div>
+              <div className="relative z-10 bg-[var(--bg-surface)] px-2 py-1 rounded border border-[var(--yellow-border)] text-center font-mono shadow-lg">
+                <div className="text-xs font-bold text-[var(--yellow)]">{tiltDeg.toFixed(1)}° ROLL</div>
+                <div className="text-[10px] text-[var(--text-muted)]">{slopeDeg.toFixed(1)}° PITCH</div>
               </div>
             </div>
 
@@ -607,79 +607,79 @@ export function TelemetryChart({
       <Panel title={t('subsystem_health')} icon={<Wrench size={16} className="text-amber-400" />}>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 text-xs">
           {/* Coolant Temp */}
-          <div className="p-3 rounded-lg bg-black/40 border border-white/5 space-y-1.5">
+          <div className="p-3 rounded-lg bg-[var(--bg-raised)] border border-[var(--border-subtle)] space-y-1.5">
             <div className="flex items-center justify-between">
-              <span className="text-slate-400 font-medium">{t('coolant_temp')}</span>
-              <Thermometer size={14} className={coolantTemp > 95 ? 'text-rose-400' : 'text-emerald-400'} />
+              <span className="text-[var(--text-muted)] font-medium">{t('coolant_temp')}</span>
+              <Thermometer size={14} className={coolantTemp > 95 ? 'text-[var(--red)]' : 'text-[var(--green)]'} />
             </div>
-            <div className="text-lg font-mono font-bold text-white">{coolantTemp.toFixed(1)} °C</div>
+            <div className="text-lg font-mono font-bold text-[var(--text-primary)]">{coolantTemp.toFixed(1)} °C</div>
             <div className="progress-track h-1.5">
               <div
-                className={`progress-fill ${coolantTemp > 100 ? 'bg-rose-500' : coolantTemp > 92 ? 'bg-amber-400' : 'bg-emerald-400'}`}
+                className={`progress-fill ${coolantTemp > 100 ? 'bg-[var(--red)]' : coolantTemp > 92 ? 'bg-[var(--yellow)]' : 'bg-[var(--green)]'}`}
                 style={{ width: `${Math.min(100, (coolantTemp / 110) * 100)}%` }}
               />
             </div>
-            <span className="text-[10px] text-slate-500">Nominal: 82–93°C</span>
+            <span className="text-[10px] text-[var(--text-muted)]">Nominal: 82–93°C</span>
           </div>
 
           {/* Hydraulic Fluid Temp */}
-          <div className="p-3 rounded-lg bg-black/40 border border-white/5 space-y-1.5">
+          <div className="p-3 rounded-lg bg-[var(--bg-raised)] border border-[var(--border-subtle)] space-y-1.5">
             <div className="flex items-center justify-between">
-              <span className="text-slate-400 font-medium">{t('hydraulic_oil')}</span>
-              <Droplets size={14} className={hydraulicTemp > 85 ? 'text-rose-400' : 'text-emerald-400'} />
+              <span className="text-[var(--text-muted)] font-medium">{t('hydraulic_oil')}</span>
+              <Droplets size={14} className={hydraulicTemp > 85 ? 'text-[var(--red)]' : 'text-[var(--green)]'} />
             </div>
-            <div className="text-lg font-mono font-bold text-white">{hydraulicTemp.toFixed(1)} °C</div>
+            <div className="text-lg font-mono font-bold text-[var(--text-primary)]">{hydraulicTemp.toFixed(1)} °C</div>
             <div className="progress-track h-1.5">
               <div
-                className={`progress-fill ${hydraulicTemp > 90 ? 'bg-rose-500' : 'bg-emerald-400'}`}
+                className={`progress-fill ${hydraulicTemp > 90 ? 'bg-[var(--red)]' : 'bg-[var(--green)]'}`}
                 style={{ width: `${Math.min(100, (hydraulicTemp / 100) * 100)}%` }}
               />
             </div>
-            <span className="text-[10px] text-slate-500">Nominal: 65–80°C</span>
+            <span className="text-[10px] text-[var(--text-muted)]">Nominal: 65–80°C</span>
           </div>
 
           {/* Engine Oil Pressure */}
-          <div className="p-3 rounded-lg bg-black/40 border border-white/5 space-y-1.5">
+          <div className="p-3 rounded-lg bg-[var(--bg-raised)] border border-[var(--border-subtle)] space-y-1.5">
             <div className="flex items-center justify-between">
-              <span className="text-slate-400 font-medium">{t('oil_pressure')}</span>
+              <span className="text-[var(--text-muted)] font-medium">{t('oil_pressure')}</span>
               <Gauge size={14} className="text-sky-400" />
             </div>
-            <div className="text-lg font-mono font-bold text-white">{oilPressure.toFixed(0)} psi</div>
+            <div className="text-lg font-mono font-bold text-[var(--text-primary)]">{oilPressure.toFixed(0)} psi</div>
             <div className="progress-track h-1.5">
               <div
                 className="progress-fill bg-sky-400"
                 style={{ width: `${Math.min(100, (oilPressure / 70) * 100)}%` }}
               />
             </div>
-            <span className="text-[10px] text-slate-500">Operating: 45–65 psi</span>
+            <span className="text-[10px] text-[var(--text-muted)]">Operating: 45–65 psi</span>
           </div>
 
           {/* DEF / AdBlue Tank */}
-          <div className="p-3 rounded-lg bg-black/40 border border-white/5 space-y-1.5">
+          <div className="p-3 rounded-lg bg-[var(--bg-raised)] border border-[var(--border-subtle)] space-y-1.5">
             <div className="flex items-center justify-between">
-              <span className="text-slate-400 font-medium">{t('def_fluid')}</span>
+              <span className="text-[var(--text-muted)] font-medium">{t('def_fluid')}</span>
               <Flame size={14} className="text-indigo-400" />
             </div>
-            <div className="text-lg font-mono font-bold text-white">{defLevel.toFixed(0)}%</div>
+            <div className="text-lg font-mono font-bold text-[var(--text-primary)]">{defLevel.toFixed(0)}%</div>
             <div className="progress-track h-1.5">
               <div
                 className="progress-fill bg-indigo-400"
                 style={{ width: `${defLevel}%` }}
               />
             </div>
-            <span className="text-[10px] text-slate-500">Range: 42 hrs run</span>
+            <span className="text-[10px] text-[var(--text-muted)]">Range: 42 hrs run</span>
           </div>
 
           {/* Battery Alternator */}
-          <div className="p-3 rounded-lg bg-black/40 border border-white/5 space-y-1.5">
+          <div className="p-3 rounded-lg bg-[var(--bg-raised)] border border-[var(--border-subtle)] space-y-1.5">
             <div className="flex items-center justify-between">
-              <span className="text-slate-400 font-medium">{t('battery_voltage')}</span>
-              <BatteryCharging size={14} className="text-emerald-400" />
+              <span className="text-[var(--text-muted)] font-medium">{t('battery_voltage')}</span>
+              <BatteryCharging size={14} className="text-[var(--green)]" />
             </div>
-            <div className="text-lg font-mono font-bold text-white">{batteryVoltage.toFixed(1)} V</div>
+            <div className="text-lg font-mono font-bold text-[var(--text-primary)]">{batteryVoltage.toFixed(1)} V</div>
             <div className="progress-track h-1.5">
               <div
-                className="progress-fill bg-emerald-400"
+                className="progress-fill bg-[var(--green)]"
                 style={{ width: `${Math.min(100, (batteryVoltage / 28) * 100)}%` }}
               />
             </div>

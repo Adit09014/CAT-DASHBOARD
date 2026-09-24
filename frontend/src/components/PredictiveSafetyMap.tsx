@@ -282,10 +282,10 @@ export function PredictiveSafetyMap({ taskId = 1, operatorName, machineCode }: P
       <div
         className={`p-3 rounded-lg border flex items-center justify-between gap-3 text-xs ${
           isAlarmTriggered
-            ? 'bg-red-950/40 border-red-500/60 text-red-200'
+            ? 'status-banner-critical'
             : sim?.state === 'CRITICAL' || sim?.state === 'WARNING'
-            ? 'bg-amber-950/30 border-amber-500/40 text-amber-200'
-            : 'bg-emerald-950/20 border-emerald-500/30 text-emerald-300'
+            ? 'status-banner-elevated'
+            : 'status-banner-safe'
         }`}
       >
         <div className="flex items-center gap-2.5">

@@ -106,18 +106,18 @@ export function AdminDashboardPage() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setActiveTab('duration')}
-            className="btn btn-secondary gap-1.5 text-xs border-yellow-500/40 text-yellow-300 hover:border-yellow-400 bg-yellow-950/20"
+            className="btn text-[11px] gap-1.5 border border-[var(--yellow-border)] text-[var(--text-brand)] hover:border-[var(--yellow)] bg-[var(--yellow-dim)] font-semibold"
             title="Open Fleet Task Completion Forecaster"
           >
-            <Clock size={12} className="text-yellow-400" />
+            <Clock size={12} className="text-[var(--yellow)]" />
             <span className="hidden sm:inline">{t('tab_duration', 'Time Forecaster')}</span>
           </button>
           <button
             onClick={() => setActiveTab('sentinel')}
-            className="btn btn-secondary gap-1.5 text-xs border-rose-500/40 text-rose-300 hover:border-rose-400"
+            className="btn btn-secondary gap-1.5 text-xs border-[var(--red-border)] text-[var(--red)] hover:border-[var(--red)]"
             title="Open Safety Sentinel Anomaly & Hazard Center"
           >
-            <TriangleAlert size={12} className="text-rose-400 animate-pulse" />
+            <TriangleAlert size={12} className="text-[var(--red)] animate-pulse" />
             <span className="hidden sm:inline">{t('tab_alerts', 'Safety Sentinel')}</span>
             <span className="chip chip-red text-[9px] py-0 px-1 font-bold">
               {anomalyAlerts.data?.length || 0} Alerts
@@ -254,21 +254,21 @@ export function AdminDashboardPage() {
               </div>
 
               {/* Fleet Safety Sentinel Banner */}
-              <div className="p-4 rounded-xl border border-rose-500/30 bg-rose-950/20 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="p-4 rounded-xl status-banner-critical flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-center gap-3.5">
-                  <div className="p-2.5 rounded-lg border border-rose-500/40 bg-rose-500/20 text-rose-400">
+                  <div className="p-2.5 rounded-lg border border-[var(--red-border)] bg-[var(--red-dim)] text-[var(--red)]">
                     <TriangleAlert size={22} className="animate-pulse" />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-white uppercase tracking-wider">
+                      <span className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider">
                         Fleet Safety Sentinel & Hazard Intelligence
                       </span>
                       <span className="chip chip-red text-[10px] font-bold">
                         {anomalyAlerts.data?.length || 0} Incident Alerts
                       </span>
                     </div>
-                    <p className="text-xs text-slate-300 mt-1">
+                    <p className="text-xs text-[var(--text-secondary)] mt-1">
                       Scikit-learn pipeline monitoring rollover tilt, proximity breach, unfastened seatbelt, and operator fatigue across all active machines.
                     </p>
                   </div>
@@ -277,7 +277,7 @@ export function AdminDashboardPage() {
                 <div className="flex items-center gap-2 self-start md:self-auto">
                   <button
                     onClick={() => setActiveTab('sentinel')}
-                    className="btn btn-secondary text-xs py-1.5 px-3 flex items-center gap-1.5 hover:border-[var(--cat-yellow)]"
+                    className="btn btn-secondary text-xs py-1.5 px-3 flex items-center gap-1.5 hover:border-[var(--yellow)]"
                   >
                     <span>Open Safety Sentinel</span>
                     <ChevronRight size={13} />
@@ -286,10 +286,10 @@ export function AdminDashboardPage() {
               </div>
 
               <div className="grid gap-4 md:grid-cols-3">
-                <div onClick={() => setActiveTab('duration')} className="jump-card border-yellow-500/30 bg-yellow-950/10 hover:border-yellow-400 transition-all cursor-pointer">
+                <div onClick={() => setActiveTab('duration')} className="jump-card border-[var(--yellow-border)] hover:border-[var(--yellow)] transition-all cursor-pointer">
                   <div className="flex items-start justify-between">
-                    <div className="jump-card-icon bg-yellow-500/20">
-                      <Clock size={18} className="text-yellow-400" />
+                    <div className="jump-card-icon bg-[var(--yellow-dim)]">
+                      <Clock size={18} className="text-[var(--yellow)]" />
                     </div>
                     <span className="chip chip-yellow text-[9px] py-0.5">CATBOOST ML</span>
                   </div>

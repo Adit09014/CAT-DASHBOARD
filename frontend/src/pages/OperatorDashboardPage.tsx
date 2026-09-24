@@ -146,10 +146,10 @@ export function OperatorDashboardPage() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setActiveTab('duration')}
-            className="btn text-[11px] gap-1.5 border border-yellow-500/40 text-yellow-300 hover:border-yellow-400 bg-yellow-950/20"
+            className="btn text-[11px] gap-1.5 border border-[var(--yellow-border)] text-[var(--text-brand)] hover:border-[var(--yellow)] bg-[var(--yellow-dim)] font-semibold"
             title="Open Task Time Completion Forecaster"
           >
-            <Clock size={12} className="text-yellow-400" />
+            <Clock size={12} className="text-[var(--yellow)]" />
             <span className="hidden sm:inline">{t('tab_duration', 'Time Forecaster')}</span>
           </button>
 
@@ -157,14 +157,14 @@ export function OperatorDashboardPage() {
             onClick={() => setActiveTab('alerts')}
             className={`btn text-[11px] gap-1.5 border transition-all ${
               isSafetyAlert
-                ? 'bg-rose-950/50 border-rose-500/50 text-rose-300 animate-pulse'
+                ? 'status-banner-critical text-[var(--red)] animate-pulse'
                 : threatLevel === 'ELEVATED'
-                ? 'bg-amber-950/40 border-amber-500/50 text-amber-300'
-                : 'bg-black/30 border-slate-700 text-slate-300 hover:border-slate-500'
+                ? 'status-banner-elevated text-[var(--text-brand)]'
+                : 'btn-secondary text-[var(--text-secondary)]'
             }`}
             title="Open Safety Sentinel Anomaly & Hazard Center"
           >
-            <TriangleAlert size={12} className={isSafetyAlert ? 'text-rose-400' : threatLevel === 'ELEVATED' ? 'text-amber-400' : 'text-slate-400'} />
+            <TriangleAlert size={12} className={isSafetyAlert ? 'text-[var(--red)]' : threatLevel === 'ELEVATED' ? 'text-[var(--yellow)]' : 'text-[var(--text-muted)]'} />
             <span className="hidden sm:inline">{t('tab_alerts', 'Sentinel')}:</span>
             <span className="font-bold">{threatLevel} ({(alertProb * 100).toFixed(0)}%)</span>
           </button>
@@ -337,64 +337,64 @@ export function OperatorDashboardPage() {
               {/* ML Safety Sentinel & Anomaly Alert Card */}
               <div className={`p-4 rounded-xl border flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all ${
                 isSafetyAlert
-                  ? 'bg-rose-950/40 border-rose-500/50 shadow-lg shadow-rose-950/30'
+                  ? 'status-banner-critical'
                   : threatLevel === 'ELEVATED'
-                  ? 'bg-amber-950/30 border-amber-500/40'
+                  ? 'status-banner-elevated'
                   : 'bg-[var(--bg-surface)] border-[var(--border-subtle)]'
               }`}>
                 <div className="flex items-center gap-3.5">
                   <div className={`p-2.5 rounded-lg border ${
                     isSafetyAlert
-                      ? 'bg-rose-500/20 border-rose-500/40 text-rose-400'
+                      ? 'bg-[var(--red-dim)] border-[var(--red-border)] text-[var(--red)]'
                       : threatLevel === 'ELEVATED'
-                      ? 'bg-amber-500/20 border-amber-500/40 text-amber-400'
-                      : 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400'
+                      ? 'bg-[var(--yellow-dim)] border-[var(--yellow-border)] text-[var(--yellow)]'
+                      : 'bg-[var(--green-dim)] border-[var(--green-border)] text-[var(--green)]'
                   }`}>
                     <ShieldAlert size={22} />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-white uppercase tracking-wider">
+                      <span className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider">
                         ML Safety Sentinel · Threat State:
                       </span>
                       <span className={`chip text-[10px] font-bold ${
-                        isSafetyAlert ? 'chip-red animate-pulse' : threatLevel === 'ELEVATED' ? 'chip-amber' : 'chip-green'
+                        isSafetyAlert ? 'chip-red animate-pulse' : threatLevel === 'ELEVATED' ? 'chip-yellow' : 'chip-green'
                       }`}>
                         {threatLevel} ({(alertProb * 100).toFixed(1)}%)
                       </span>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-slate-300">
-                      <span>Roll Tilt: <strong className="text-white">{(telemetry.machine_tilt_deg ?? 1.8).toFixed(1)}°</strong></span>
-                      <span className="text-slate-600">·</span>
-                      <span>Slope: <strong className="text-white">{(telemetry.ground_slope_deg ?? 2.5).toFixed(1)}°</strong></span>
-                      <span className="text-slate-600">·</span>
-                      <span>Obstacle: <strong className="text-white">{(telemetry.min_obstacle_distance_m ?? 25.0).toFixed(1)}m</strong></span>
-                      <span className="text-slate-600">·</span>
-                      <span>Seatbelt: <strong className={telemetry.seatbelt_status ? 'text-emerald-400' : 'text-rose-400 font-bold'}>{telemetry.seatbelt_status ? 'Fastened' : 'DISENGAGED'}</strong></span>
+                    <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-[var(--text-secondary)]">
+                      <span>Roll Tilt: <strong className="text-[var(--text-primary)]">{(telemetry.machine_tilt_deg ?? 1.8).toFixed(1)}°</strong></span>
+                      <span className="text-[var(--text-muted)]">·</span>
+                      <span>Slope: <strong className="text-[var(--text-primary)]">{(telemetry.ground_slope_deg ?? 2.5).toFixed(1)}°</strong></span>
+                      <span className="text-[var(--text-muted)]">·</span>
+                      <span>Obstacle: <strong className="text-[var(--text-primary)]">{(telemetry.min_obstacle_distance_m ?? 25.0).toFixed(1)}m</strong></span>
+                      <span className="text-[var(--text-muted)]">·</span>
+                      <span>Seatbelt: <strong className={telemetry.seatbelt_status ? 'text-[var(--green)]' : 'text-[var(--red)] font-bold'}>{telemetry.seatbelt_status ? 'Fastened' : 'DISENGAGED'}</strong></span>
                     </div>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-3">
                   {riskFactors.length > 0 && (
-                    <div className="hidden xl:flex items-center gap-1.5 text-xs text-rose-300 bg-rose-950/40 border border-rose-500/30 px-2.5 py-1 rounded">
-                      <TriangleAlert size={12} className="text-rose-400" />
+                    <div className="hidden xl:flex items-center gap-1.5 text-xs text-[var(--red)] bg-[var(--red-dim)] border border-[var(--red-border)] px-2.5 py-1 rounded">
+                      <TriangleAlert size={12} className="text-[var(--red)]" />
                       <span>{riskFactors[0].factor}</span>
                     </div>
                   )}
 
                   <button
                     onClick={handleExplainOverviewHazard}
-                    className="btn btn-secondary text-xs py-1.5 px-3 flex items-center gap-1.5 border-amber-500/40 text-amber-300 hover:border-amber-400 hover:bg-amber-950/30 shadow"
+                    className="btn btn-secondary text-xs py-1.5 px-3 flex items-center gap-1.5 border-[var(--yellow-border)] text-[var(--text-brand)] hover:border-[var(--yellow)] hover:bg-[var(--yellow-dim)] shadow"
                     title="Inspect Explainable AI Hazard Narrative"
                   >
-                    <Sparkles size={13} className="text-[var(--cat-yellow)]" />
+                    <Sparkles size={13} className="text-[var(--yellow)]" />
                     <span>{t('explain_alert', 'Explain Narrative')}</span>
                   </button>
 
                   <button
                     onClick={() => setActiveTab('alerts')}
-                    className="btn btn-secondary text-xs py-1.5 px-3 flex items-center gap-1.5 hover:border-[var(--cat-yellow)]"
+                    className="btn btn-secondary text-xs py-1.5 px-3 flex items-center gap-1.5 hover:border-[var(--yellow)]"
                   >
                     <span>Open Sentinel Center</span>
                     <ChevronRight size={13} />
@@ -406,11 +406,11 @@ export function OperatorDashboardPage() {
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <div
                   onClick={() => setActiveTab('duration')}
-                  className="jump-card border-yellow-500/30 bg-yellow-950/10 hover:border-yellow-400 transition-all cursor-pointer"
+                  className="jump-card border-[var(--yellow-border)] hover:border-[var(--yellow)] cursor-pointer"
                 >
                   <div className="flex items-start justify-between">
-                    <div className="jump-card-icon bg-yellow-500/20">
-                      <Clock size={18} className="text-yellow-400" />
+                    <div className="jump-card-icon bg-[var(--yellow-dim)]">
+                      <Clock size={18} className="text-[var(--yellow)]" />
                     </div>
                     <span className="chip chip-yellow text-[9px] py-0.5">CATBOOST</span>
                   </div>

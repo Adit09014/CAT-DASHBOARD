@@ -246,13 +246,13 @@ export function AnomalySentinelPanel({ onNavigateToCopilot }: AnomalySentinelPan
         </div>
 
         {/* View Switcher Tabs */}
-        <div className="flex items-center gap-1.5 bg-black/60 border border-white/10 rounded-lg p-1 text-xs self-start sm:self-auto">
+        <div className="flex items-center gap-1.5 bg-[var(--bg-raised)] border border-[var(--border-default)] rounded-lg p-1 text-xs self-start sm:self-auto">
           <button
             onClick={() => setActiveSection('monitor')}
             className={`px-3 py-1.5 rounded-md transition-all ${
               activeSection === 'monitor'
                 ? 'bg-amber-400 text-black font-extrabold shadow-md shadow-amber-500/25'
-                : 'text-zinc-400 hover:text-white hover:bg-white/10 font-medium'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] font-medium'
             }`}
           >
             {t('live_diagnostics')}
@@ -265,7 +265,7 @@ export function AnomalySentinelPanel({ onNavigateToCopilot }: AnomalySentinelPan
             className={`px-3 py-1.5 rounded-md transition-all ${
               activeSection === 'simulator'
                 ? 'bg-amber-400 text-black font-extrabold shadow-md shadow-amber-500/25'
-                : 'text-zinc-400 hover:text-white hover:bg-white/10 font-medium'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] font-medium'
             }`}
           >
             {t('ml_simulator')}
@@ -275,12 +275,12 @@ export function AnomalySentinelPanel({ onNavigateToCopilot }: AnomalySentinelPan
             className={`px-3 py-1.5 rounded-md transition-all flex items-center gap-1.5 ${
               activeSection === 'alerts'
                 ? 'bg-amber-400 text-black font-extrabold shadow-md shadow-amber-500/25'
-                : 'text-zinc-400 hover:text-white hover:bg-white/10 font-medium'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] font-medium'
             }`}
           >
             <span>{t('alert_feed')}</span>
             <span className={`text-[10px] px-1.5 py-0 rounded-full font-bold ${
-              activeSection === 'alerts' ? 'bg-black text-amber-500 font-extrabold' : 'bg-white/10 text-white'
+              activeSection === 'alerts' ? 'bg-black text-amber-400 font-extrabold' : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)]'
             }`}>
               {alertsQuery.data?.length || 0}
             </span>
@@ -291,41 +291,41 @@ export function AnomalySentinelPanel({ onNavigateToCopilot }: AnomalySentinelPan
       {/* ── Status Banner ─────────────────────────────────── */}
       <div className={`p-4 rounded-xl border flex flex-col md:flex-row md:items-center justify-between gap-4 transition-colors ${
         threatLevel === 'CRITICAL'
-          ? 'bg-rose-950/40 border-rose-500/40 shadow-lg shadow-rose-950/30'
+          ? 'status-banner-critical'
           : threatLevel === 'ELEVATED'
-          ? 'bg-amber-950/30 border-amber-500/40 shadow-lg shadow-amber-950/20'
-          : 'bg-emerald-950/20 border-emerald-500/30'
+          ? 'status-banner-elevated'
+          : 'status-banner-safe'
       }`}>
         <div className="flex items-start md:items-center gap-3.5">
           <div className={`p-2.5 rounded-lg border ${
             threatLevel === 'CRITICAL'
-              ? 'bg-rose-500/20 border-rose-500/40 text-rose-400'
+              ? 'bg-[var(--red-dim)] border-[var(--red-border)] text-[var(--red)]'
               : threatLevel === 'ELEVATED'
-              ? 'bg-amber-500/20 border-amber-500/40 text-amber-400'
-              : 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400'
+              ? 'bg-[var(--yellow-dim)] border-[var(--yellow-border)] text-[var(--yellow)]'
+              : 'bg-[var(--green-dim)] border-[var(--green-border)] text-[var(--green)]'
           }`}>
             <ShieldAlert size={28} />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-base font-bold text-white tracking-tight">
+              <h2 className="text-base font-bold text-[var(--text-primary)] tracking-tight">
                 {t('sentinel_threat_state')}: {threatLevel}
               </h2>
               <span className={`chip text-[11px] font-bold uppercase ${
-                threatLevel === 'CRITICAL' ? 'chip-red' : threatLevel === 'ELEVATED' ? 'chip-amber' : 'chip-green'
+                threatLevel === 'CRITICAL' ? 'chip-red' : threatLevel === 'ELEVATED' ? 'chip-yellow' : 'chip-green'
               }`}>
                 {threatLevel === 'CRITICAL' ? t('safety_alert_active') : threatLevel === 'ELEVATED' ? t('elevated_risk') : t('normal_operations')}
               </span>
             </div>
-            <p className="text-xs text-slate-300 mt-0.5">
-              Machine: <span className="font-semibold text-white">{liveData?.machine?.machine_code || 'EXC-001'}</span> ({liveData?.machine?.machine_type || 'Excavator'}) ·
-              Operator: <span className="font-semibold text-white">{user?.name || 'Avery Stone'}</span> ·
-              Decision Threshold τ = <span className="font-mono text-amber-300 font-semibold">{threshold.toFixed(3)}</span>
+            <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+              Machine: <span className="font-semibold text-[var(--text-primary)]">{liveData?.machine?.machine_code || 'EXC-001'}</span> ({liveData?.machine?.machine_type || 'Excavator'}) ·
+              Operator: <span className="font-semibold text-[var(--text-primary)]">{user?.name || 'Avery Stone'}</span> ·
+              Decision Threshold τ = <span className="font-mono text-[var(--text-brand)] font-semibold">{threshold.toFixed(3)}</span>
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-4 bg-black/40 border border-white/10 rounded-lg px-4 py-2 self-start md:self-auto">
+        <div className="flex items-center gap-4 bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-lg px-4 py-2 self-start md:self-auto">
           <div>
             <div className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">{t('model_probability')}</div>
             <div className={`text-2xl font-mono font-bold ${
@@ -886,16 +886,16 @@ export function AnomalySentinelPanel({ onNavigateToCopilot }: AnomalySentinelPan
               
               <div className={`p-4 rounded-xl border text-center transition-all ${
                 activeSimTriggered
-                  ? 'bg-rose-950/40 border-rose-500/50 shadow-lg shadow-rose-950/40'
+                  ? 'status-banner-critical'
                   : activeSimProb >= 0.4
-                  ? 'bg-amber-950/30 border-amber-500/40'
-                  : 'bg-emerald-950/20 border-emerald-500/30'
+                  ? 'status-banner-elevated'
+                  : 'status-banner-safe'
               }`}>
-                <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
+                <div className="text-[10px] text-[var(--text-muted)] font-semibold uppercase tracking-wider">
                   Model Predicted Threat Level
                 </div>
                 <div className={`text-3xl font-black tracking-tight my-1 ${
-                  activeSimTriggered ? 'text-rose-400' : activeSimProb >= 0.4 ? 'text-amber-400' : 'text-emerald-400'
+                  activeSimTriggered ? 'text-[var(--red)]' : activeSimProb >= 0.4 ? 'text-[var(--yellow)]' : 'text-[var(--green)]'
                 }`}>
                   {activeSimThreat}
                 </div>
@@ -945,17 +945,17 @@ export function AnomalySentinelPanel({ onNavigateToCopilot }: AnomalySentinelPan
                 <div className="space-y-2">
                   {simResult?.top_risk_contributors?.length ? (
                     simResult.top_risk_contributors.map((c: any, i: number) => (
-                      <div key={i} className="flex items-center justify-between text-xs p-2 rounded bg-black/30 border border-white/5">
-                        <span className="text-slate-300">{c.feature}</span>
+                      <div key={i} className="flex items-center justify-between text-xs p-2 rounded bg-[var(--bg-raised)] border border-[var(--border-subtle)]">
+                        <span className="text-[var(--text-secondary)]">{c.feature}</span>
                         <span className={`chip py-0 px-1 text-[9px] font-mono ${
-                          c.impact.includes('High') || c.impact.includes('Critical') ? 'chip-red' : 'chip-amber'
+                          c.impact.includes('High') || c.impact.includes('Critical') ? 'chip-red' : 'chip-yellow'
                         }`}>
                           +{c.score}
                         </span>
                       </div>
                     ))
                   ) : (
-                    <div className="text-xs text-slate-500 italic p-3 text-center">
+                    <div className="text-xs text-[var(--text-muted)] italic p-3 text-center">
                       Input parameters are currently within normal baseline ranges.
                     </div>
                   )}
@@ -974,9 +974,9 @@ export function AnomalySentinelPanel({ onNavigateToCopilot }: AnomalySentinelPan
                     });
                   }}
                   disabled={generateNarrativeMutation.isPending}
-                  className="btn btn-secondary text-xs py-2 px-3 w-full mt-4 flex items-center justify-center gap-1.5 border-[var(--cat-yellow)]/40 text-yellow-300 hover:border-[var(--cat-yellow)] hover:bg-yellow-950/20"
+                  className="btn btn-secondary text-xs py-2 px-3 w-full mt-4 flex items-center justify-center gap-1.5 border-[var(--yellow-border)] text-[var(--text-brand)] hover:border-[var(--yellow)] hover:bg-[var(--yellow-dim)] font-semibold"
                 >
-                  <Sparkles size={13} className="text-[var(--cat-yellow)]" />
+                  <Sparkles size={13} className="text-[var(--yellow)]" />
                   <span>{t('explain_alert', 'Explain Simulation Narrative')}</span>
                 </button>
               </div>
@@ -990,10 +990,10 @@ export function AnomalySentinelPanel({ onNavigateToCopilot }: AnomalySentinelPan
       {/* ── SECTION 3: ALERTS FEED & MANAGEMENT ─────────────────────────── */}
       {activeSection === 'alerts' && (
         <div className="space-y-4">
-          <Panel title="Historical & Live Safety Anomaly Incidents" icon={<ShieldAlert size={16} className="text-rose-400" />}>
+          <Panel title="Historical & Live Safety Anomaly Incidents" icon={<ShieldAlert size={16} className="text-[var(--red)]" />}>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead className="bg-black/30 text-slate-400 uppercase text-[10px] tracking-wider border-b border-white/5">
+                <thead className="bg-[var(--bg-raised)] text-[var(--text-muted)] uppercase text-[10px] tracking-wider border-b border-[var(--border-subtle)]">
                   <tr>
                     <th className="py-2.5 px-3">Alert ID</th>
                     <th className="py-2.5 px-3">Type</th>

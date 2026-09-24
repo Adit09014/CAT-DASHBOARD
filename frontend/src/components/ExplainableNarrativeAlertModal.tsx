@@ -199,20 +199,20 @@ export function ExplainableNarrativeAlertModal({
         <div
           className={`px-5 py-4 border-b flex items-start justify-between gap-4 ${
             isCritical
-              ? 'bg-rose-950/50 border-rose-500/40'
+              ? 'status-banner-critical'
               : isElevated
-              ? 'bg-amber-950/40 border-amber-500/40'
-              : 'bg-emerald-950/30 border-emerald-500/30'
+              ? 'status-banner-elevated'
+              : 'status-banner-safe'
           }`}
         >
           <div className="flex items-start gap-3.5 flex-1 min-w-0 pr-2">
             <div
               className={`p-2.5 rounded-xl border mt-0.5 shrink-0 ${
                 isCritical
-                  ? 'bg-rose-500/20 border-rose-500/40 text-rose-400 animate-pulse'
+                  ? 'bg-[var(--red-dim)] border-[var(--red-border)] text-[var(--red)] animate-pulse'
                   : isElevated
-                  ? 'bg-amber-500/20 border-amber-500/40 text-amber-400'
-                  : 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400'
+                  ? 'bg-[var(--yellow-dim)] border-[var(--yellow-border)] text-[var(--yellow)]'
+                  : 'bg-[var(--green-dim)] border-[var(--green-border)] text-[var(--green)]'
               }`}
             >
               <ShieldAlert size={24} />
@@ -222,7 +222,7 @@ export function ExplainableNarrativeAlertModal({
               <div className="flex flex-wrap items-center gap-2 mb-1">
                 <span
                   className={`chip text-[11px] font-black uppercase tracking-wider py-0.5 px-2.5 ${
-                    isCritical ? 'chip-red' : isElevated ? 'chip-amber' : 'chip-green'
+                    isCritical ? 'chip-red' : isElevated ? 'chip-yellow' : 'chip-green'
                   }`}
                 >
                   {threat}
@@ -232,7 +232,7 @@ export function ExplainableNarrativeAlertModal({
                   {alert.machine_code}
                 </span>
 
-                <span className={`text-xs font-mono font-bold ${isCritical ? 'text-rose-300' : isElevated ? 'text-amber-300' : 'text-emerald-300'}`}>
+                <span className={`text-xs font-mono font-bold ${isCritical ? 'text-[var(--red)]' : isElevated ? 'text-[var(--yellow)]' : 'text-[var(--green)]'}`}>
                   {alert.confidence_pct}% {t('model_probability', 'Model Confidence')}
                 </span>
 
@@ -266,14 +266,14 @@ export function ExplainableNarrativeAlertModal({
         <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6 text-xs sm:text-sm">
 
           {/* 1. Voice In-Cab Briefing Banner */}
-          <div className="p-3.5 rounded-xl bg-black/40 border border-white/10 flex items-center justify-between gap-4">
+          <div className="p-3.5 rounded-xl bg-[var(--bg-raised)] border border-[var(--border-subtle)] flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <button
                 onClick={handleToggleAudio}
                 className={`btn py-2 px-3.5 text-xs font-semibold flex items-center gap-2 rounded-lg transition-all ${
                   isPlayingAudio
-                    ? 'bg-rose-500 text-white animate-pulse shadow-lg shadow-rose-500/30'
-                    : 'bg-[var(--cat-yellow)] text-black hover:brightness-110 shadow'
+                    ? 'btn-danger text-white animate-pulse shadow-lg'
+                    : 'btn-primary shadow'
                 }`}
               >
                 {isPlayingAudio ? <VolumeX size={15} /> : <Volume2 size={15} />}
@@ -281,10 +281,10 @@ export function ExplainableNarrativeAlertModal({
               </button>
 
               <div className="hidden sm:flex flex-col">
-                <span className="text-[11px] text-slate-400 font-medium">
+                <span className="text-[11px] text-[var(--text-muted)] font-medium">
                   {t('voice_briefing', 'Voice Briefing (TTS)')}
                 </span>
-                <span className="text-xs text-slate-200 line-clamp-1 italic">
+                <span className="text-xs text-[var(--text-secondary)] line-clamp-1 italic">
                   "{alert.audio_briefing_text}"
                 </span>
               </div>
@@ -292,46 +292,46 @@ export function ExplainableNarrativeAlertModal({
 
             {isPlayingAudio && (
               <div className="flex items-center gap-1">
-                <span className="w-1 h-4 bg-[var(--cat-yellow)] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="w-1 h-6 bg-[var(--cat-yellow)] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span className="w-1 h-3 bg-[var(--cat-yellow)] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                <span className="w-1 h-5 bg-[var(--cat-yellow)] rounded-full animate-bounce" style={{ animationDelay: '450ms' }} />
+                <span className="w-1 h-4 bg-[var(--yellow)] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <span className="w-1 h-6 bg-[var(--yellow)] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <span className="w-1 h-3 bg-[var(--yellow)] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                <span className="w-1 h-5 bg-[var(--yellow)] rounded-full animate-bounce" style={{ animationDelay: '450ms' }} />
               </div>
             )}
           </div>
 
           {/* 2. Executive Narrative Summary */}
-          <div className="p-4 sm:p-5 rounded-xl bg-slate-900/60 border border-white/10 relative overflow-hidden">
+          <div className="p-4 sm:p-5 rounded-xl bg-[var(--bg-raised)] border border-[var(--border-default)] relative overflow-hidden">
             <div
               className={`absolute top-0 left-0 bottom-0 w-1.5 ${
-                isCritical ? 'bg-rose-500' : isElevated ? 'bg-amber-400' : 'bg-emerald-400'
+                isCritical ? 'bg-[var(--red)]' : isElevated ? 'bg-[var(--yellow)]' : 'bg-[var(--green)]'
               }`}
             />
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                <FileText size={13} className="text-[var(--cat-yellow)]" />
+              <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1.5">
+                <FileText size={13} className="text-[var(--yellow)]" />
                 {t('executive_summary', 'Executive Narrative Summary')}
               </span>
-              <span className="text-[10px] text-slate-500 font-mono">
+              <span className="text-[10px] text-[var(--text-muted)] font-mono">
                 {alert.timestamp ? new Date(alert.timestamp).toLocaleTimeString() : 'Real-Time'}
               </span>
             </div>
-            <p className="text-slate-100 text-xs sm:text-sm leading-relaxed font-medium">
+            <p className="text-[var(--text-primary)] text-xs sm:text-sm leading-relaxed font-medium">
               {alert.summary_narrative}
             </p>
 
             {/* Expandable Technical Analysis */}
-            <div className="mt-3 pt-3 border-t border-white/5">
+            <div className="mt-3 pt-3 border-t border-[var(--border-subtle)]">
               <button
                 onClick={() => setShowDetailedTech(!showDetailedTech)}
-                className="text-xs text-sky-400 hover:text-sky-300 font-semibold flex items-center gap-1"
+                className="text-xs text-[var(--blue)] hover:underline font-semibold flex items-center gap-1"
               >
                 <span>{showDetailedTech ? 'Hide' : 'View'} {t('incident_details', 'Technical Telemetry Breakdown')}</span>
                 <ChevronRight size={12} className={`transform transition-transform ${showDetailedTech ? 'rotate-90' : ''}`} />
               </button>
 
               {showDetailedTech && (
-                <div className="mt-2.5 p-3 rounded-lg bg-black/40 border border-white/5 text-xs text-slate-300 leading-relaxed font-mono">
+                <div className="mt-2.5 p-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-xs text-[var(--text-secondary)] leading-relaxed font-mono">
                   {alert.detailed_analysis}
                 </div>
               )}
@@ -341,8 +341,8 @@ export function ExplainableNarrativeAlertModal({
           {/* 3. Causal Reasoning Progression Chain */}
           {alert.causal_chain && alert.causal_chain.length > 0 && (
             <div>
-              <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
-                <Layers size={13} className="text-sky-400" />
+              <div className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] mb-3 flex items-center gap-1.5">
+                <Layers size={13} className="text-[var(--blue)]" />
                 {t('causal_chain', 'Causal Reasoning Progression')}
               </div>
 
@@ -350,16 +350,16 @@ export function ExplainableNarrativeAlertModal({
                 {alert.causal_chain.map((node, idx) => (
                   <div
                     key={idx}
-                    className="flex items-start gap-3 p-2.5 rounded-lg bg-black/30 border border-white/5 hover:border-white/10 transition-colors"
+                    className="flex items-start gap-3 p-2.5 rounded-lg bg-[var(--bg-raised)] border border-[var(--border-subtle)] transition-colors"
                   >
-                    <div className="w-5 h-5 rounded-full bg-slate-800 border border-slate-700 text-[10px] font-bold text-amber-300 flex items-center justify-center shrink-0 mt-0.5">
+                    <div className="w-5 h-5 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-default)] text-[10px] font-bold text-[var(--text-brand)] flex items-center justify-center shrink-0 mt-0.5">
                       {idx + 1}
                     </div>
-                    <div className="flex-1 text-xs text-slate-200">
+                    <div className="flex-1 text-xs text-[var(--text-secondary)]">
                       {node}
                     </div>
                     {idx < alert.causal_chain.length - 1 && (
-                      <ArrowRight size={13} className="text-slate-600 hidden sm:block mt-1 shrink-0" />
+                      <ArrowRight size={13} className="text-[var(--text-muted)] hidden sm:block mt-1 shrink-0" />
                     )}
                   </div>
                 ))}
@@ -385,32 +385,32 @@ export function ExplainableNarrativeAlertModal({
                   return (
                     <div
                       key={idx}
-                      className={`p-3 rounded-xl bg-black/30 border border-white/5 hover:border-white/15 transition-all flex flex-col justify-between ${
+                      className={`p-3 rounded-xl bg-[var(--bg-raised)] border border-[var(--border-subtle)] hover:border-[var(--border-default)] transition-all flex flex-col justify-between ${
                         isSingle ? 'sm:col-span-2' : ''
                       }`}
                     >
                       <div>
                         <div className="flex items-center justify-between gap-2 mb-1.5">
-                          <span className="font-semibold text-slate-200 text-xs truncate">
+                          <span className="font-semibold text-[var(--text-primary)] text-xs truncate">
                             {attr.feature}
                           </span>
                           <span
                             className={`chip text-[9px] font-mono font-bold py-0.5 px-1.5 ${
-                              isHighImpact ? 'chip-red' : 'chip-amber'
+                              isHighImpact ? 'chip-red' : 'chip-yellow'
                             }`}
                           >
                             +{attr.contribution_weight}
                           </span>
                         </div>
 
-                        <p className="text-[11px] text-slate-400 leading-normal mb-2">
+                        <p className="text-[11px] text-[var(--text-muted)] leading-normal mb-2">
                           {attr.description}
                         </p>
                       </div>
 
-                      <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[10px] text-slate-500 font-mono">
-                        <span>{t('observed_val', 'Observed')}: <strong className="text-slate-300 font-bold">{attr.observed_value}</strong></span>
-                        <span>{t('safe_limit', 'Safe Limit')}: <strong className="text-slate-400">{attr.safe_limit}</strong></span>
+                      <div className="pt-2 border-t border-[var(--border-subtle)] flex items-center justify-between text-[10px] text-[var(--text-muted)] font-mono">
+                        <span>{t('observed_val', 'Observed')}: <strong className="text-[var(--text-secondary)] font-bold">{attr.observed_value}</strong></span>
+                        <span>{t('safe_limit', 'Safe Limit')}: <strong className="text-[var(--text-muted)]">{attr.safe_limit}</strong></span>
                       </div>
                     </div>
                   );
@@ -423,23 +423,23 @@ export function ExplainableNarrativeAlertModal({
           {alert.immediate_sop_actions && alert.immediate_sop_actions.length > 0 && (
             <div className={`p-4 sm:p-5 rounded-xl border ${
               isCritical
-                ? 'bg-rose-950/25 border-rose-500/30'
+                ? 'status-banner-critical'
                 : isElevated
-                ? 'bg-amber-950/20 border-amber-500/30'
-                : 'bg-slate-900/60 border-white/10'
+                ? 'status-banner-elevated'
+                : 'bg-[var(--bg-raised)] border-[var(--border-default)]'
             }`}>
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <AlertTriangle size={15} className={isCritical ? 'text-rose-400' : isElevated ? 'text-amber-400' : 'text-slate-400'} />
+                  <AlertTriangle size={15} className={isCritical ? 'text-[var(--red)]' : isElevated ? 'text-[var(--yellow)]' : 'text-[var(--text-muted)]'} />
                   <span className={`text-xs font-bold uppercase tracking-wider ${
-                    isCritical ? 'text-rose-200' : isElevated ? 'text-amber-200' : 'text-slate-300'
+                    isCritical ? 'text-[var(--red)]' : isElevated ? 'text-[var(--yellow)]' : 'text-[var(--text-secondary)]'
                   }`}>
                     {t('sop_checklist', 'Immediate In-Cab SOP Checklist')}
                   </span>
                 </div>
 
                 <div className="flex items-center gap-2 text-xs font-mono">
-                  <span className={allStepsFinished ? 'text-emerald-400 font-bold' : 'text-slate-400'}>
+                  <span className={allStepsFinished ? 'text-[var(--green)] font-bold' : 'text-[var(--text-muted)]'}>
                     {finishedSteps} / {totalSteps} {t('sop_progress', 'Completed')}
                   </span>
                   {allStepsFinished && (
@@ -459,15 +459,15 @@ export function ExplainableNarrativeAlertModal({
                       onClick={() => handleToggleStep(act.step)}
                       className={`p-3 rounded-lg border flex items-start gap-3 cursor-pointer transition-all select-none ${
                         isChecked
-                          ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-100'
-                          : 'bg-black/40 border-white/5 hover:border-white/15 text-slate-200'
+                          ? 'bg-[var(--green-dim)] border-[var(--green-border)] text-[var(--green)]'
+                          : 'bg-[var(--bg-surface)] border-[var(--border-subtle)] hover:border-[var(--border-default)] text-[var(--text-primary)]'
                       }`}
                     >
-                      <div className="mt-0.5 shrink-0 text-slate-400">
+                      <div className="mt-0.5 shrink-0 text-[var(--text-muted)]">
                         {isChecked ? (
-                          <CheckCircle2 size={16} className="text-emerald-400" />
+                          <CheckCircle2 size={16} className="text-[var(--green)]" />
                         ) : (
-                          <Circle size={16} className="hover:text-amber-400 transition-colors" />
+                          <Circle size={16} className="hover:text-[var(--yellow)] transition-colors" />
                         )}
                       </div>
 
@@ -475,18 +475,18 @@ export function ExplainableNarrativeAlertModal({
                         <div className="flex flex-wrap items-center gap-2 mb-0.5">
                           <span className={`text-[10px] font-bold font-mono py-0.2 px-1 rounded ${
                             act.urgency === 'IMMEDIATE'
-                              ? 'bg-rose-500/30 text-rose-300'
+                              ? 'bg-[var(--red-dim)] text-[var(--red)]'
                               : act.urgency === 'MANDATORY'
-                              ? 'bg-amber-500/30 text-amber-300'
-                              : 'bg-slate-700/50 text-slate-300'
+                              ? 'bg-[var(--yellow-dim)] text-[var(--yellow)]'
+                              : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)]'
                           }`}>
                             {act.urgency}
                           </span>
-                          <span className="text-[10px] text-slate-400 font-mono">
+                          <span className="text-[10px] text-[var(--text-muted)] font-mono">
                             {act.target_role} · {act.safety_rule}
                           </span>
                         </div>
-                        <p className={`text-xs ${isChecked ? 'line-through text-slate-400' : 'text-slate-100 font-medium'}`}>
+                        <p className={`text-xs ${isChecked ? 'line-through opacity-70' : 'font-medium'}`}>
                           {act.action}
                         </p>
                       </div>
@@ -499,11 +499,11 @@ export function ExplainableNarrativeAlertModal({
 
           {/* 6. Preventive Fleet Measures */}
           {alert.preventive_measures && alert.preventive_measures.length > 0 && (
-            <div className="p-3.5 rounded-xl bg-black/20 border border-white/5">
-              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+            <div className="p-3.5 rounded-xl bg-[var(--bg-raised)] border border-[var(--border-subtle)]">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-2">
                 {t('preventive_measures', 'Preventive Fleet Recommendations')}
               </div>
-              <ul className="list-disc list-inside space-y-1 text-xs text-slate-300">
+              <ul className="list-disc list-inside space-y-1 text-xs text-[var(--text-secondary)]">
                 {alert.preventive_measures.map((m, i) => (
                   <li key={i}>{m}</li>
                 ))}
@@ -514,7 +514,7 @@ export function ExplainableNarrativeAlertModal({
         </div>
 
         {/* ── Modal Footer ────────────────────────────────────────── */}
-        <div className="px-5 py-3.5 bg-black/40 border-t border-white/10 flex flex-wrap items-center justify-between gap-3">
+        <div className="px-5 py-3.5 bg-[var(--bg-surface)] border-t border-[var(--border-subtle)] flex flex-wrap items-center justify-between gap-3">
           <button
             onClick={handleAskCopilotClick}
             className="btn btn-secondary text-xs py-2 px-3 flex items-center gap-1.5 hover:border-[var(--cat-yellow)] text-yellow-300"

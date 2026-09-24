@@ -255,18 +255,18 @@ export function CopilotPanel({
   };
 
   return (
-    <div className="flex flex-col rounded-3xl border border-slate-800 bg-slate-950/90 shadow-2xl backdrop-blur-xl overflow-hidden min-h-[640px]">
+    <div className="flex flex-col rounded-3xl border border-[var(--border-default)] bg-[var(--bg-surface)] shadow-2xl overflow-hidden min-h-[640px]">
       {/* Header Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/80 bg-slate-900/60 px-6 py-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-subtle)] bg-[var(--bg-raised)] px-6 py-4">
         <div>
-          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.25em] text-amber-400">
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.25em] text-[var(--yellow)]">
             <Bot size={15} />
             <span>Industrial In-Cab Copilot</span>
           </div>
-          <h3 className="mt-1 text-xl font-bold text-white flex items-center gap-2">
+          <h3 className="mt-1 text-xl font-bold text-[var(--text-primary)] flex items-center gap-2">
             Machine-Aware AI Assistant
-            <span className="text-xs px-2 py-0.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 font-mono font-medium flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-xs px-2 py-0.5 rounded-full border border-[var(--green-border)] bg-[var(--green-dim)] text-[var(--green)] font-mono font-medium flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--green)] animate-pulse" />
               Live Grounded
             </span>
           </h3>
@@ -322,11 +322,11 @@ export function CopilotPanel({
 
       {/* AI Settings Drawer (Configurable API Keys) */}
       {showSettings && (
-        <div className="border-b border-amber-500/20 bg-gradient-to-r from-slate-900 via-slate-900/95 to-slate-900/90 p-5 transition-all">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div className="border-b border-[var(--border-default)] bg-[var(--bg-raised)] p-5 transition-all">
+          <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
             <div className="flex items-center gap-2">
-              <KeyRound size={16} className="text-amber-400" />
-              <h4 className="text-sm font-bold text-white uppercase tracking-wider">
+              <KeyRound size={16} className="text-amber-500" />
+              <h4 className="text-sm font-bold text-[var(--text-primary)] uppercase tracking-wider">
                 AI Engine & API Key Configuration
               </h4>
             </div>
@@ -413,19 +413,19 @@ export function CopilotPanel({
             <div
               className={`max-w-[85%] rounded-2xl p-4 shadow-md ${
                 msg.role === 'user'
-                  ? 'bg-amber-500 text-slate-950 font-medium rounded-tr-sm'
-                  : 'bg-slate-900 border border-slate-800/90 text-slate-200 rounded-tl-sm'
+                  ? 'bg-[var(--yellow)] text-slate-950 font-medium rounded-tr-sm'
+                  : 'bg-[var(--bg-raised)] border border-[var(--border-default)] text-[var(--text-primary)] rounded-tl-sm'
               }`}
             >
-              <div className="flex items-center justify-between gap-4 pb-1 mb-1 border-b border-black/10 dark:border-white/10 text-[11px]">
+              <div className="flex items-center justify-between gap-4 pb-1 mb-1 border-b border-[var(--border-subtle)] text-[11px]">
                 <span
                   className={`font-semibold ${
-                    msg.role === 'user' ? 'text-slate-900' : 'text-amber-400'
+                    msg.role === 'user' ? 'text-slate-900 font-bold' : 'text-[var(--text-brand)]'
                   }`}
                 >
                   {msg.role === 'user' ? 'Operator Query' : 'CAT Guardian Copilot'}
                 </span>
-                <span className={msg.role === 'user' ? 'text-slate-800' : 'text-slate-400'}>
+                <span className={msg.role === 'user' ? 'text-slate-800' : 'text-[var(--text-muted)]'}>
                   {msg.timestamp}
                 </span>
               </div>
@@ -524,7 +524,7 @@ export function CopilotPanel({
       </div>
 
       {/* Input Action Form */}
-      <div className="border-t border-slate-800 bg-slate-950 p-4">
+      <div className="border-t border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -538,7 +538,7 @@ export function CopilotPanel({
               value={inputQuery}
               onChange={(e) => setInputQuery(e.target.value)}
               placeholder="Ask anything about machine load, idle, trenches, safety, or hydraulic specs..."
-              className="w-full rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-white placeholder-slate-400 focus:border-amber-400 focus:outline-none transition-all shadow-inner"
+              className="w-full rounded-2xl border border-[var(--border-default)] bg-[var(--input-bg)] px-4 py-3 text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:border-[var(--yellow)] focus:outline-none transition-all shadow-inner"
             />
           </div>
 
@@ -549,8 +549,8 @@ export function CopilotPanel({
               onClick={toggleVoice}
               className={`flex items-center justify-center rounded-2xl border p-3 text-xs font-bold transition-all shadow-md ${
                 listening
-                  ? 'border-red-500 bg-red-600 text-white animate-pulse'
-                  : 'border-slate-700 bg-slate-800 text-slate-200 hover:border-slate-600 hover:text-white'
+                  ? 'border-[var(--red-border)] bg-[var(--red)] text-white animate-pulse'
+                  : 'border-[var(--border-default)] bg-[var(--bg-raised)] text-[var(--text-secondary)] hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]'
               }`}
               title="Push to talk speech-to-text"
             >
@@ -562,7 +562,7 @@ export function CopilotPanel({
           <button
             type="submit"
             disabled={loading || !inputQuery.trim()}
-            className="flex items-center gap-2 rounded-2xl border border-amber-400 bg-amber-500 px-5 py-3 text-xs font-bold uppercase tracking-wider text-slate-950 transition-all hover:bg-amber-400 disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+            className="flex items-center gap-2 rounded-2xl border border-[var(--yellow)] bg-[var(--yellow)] px-5 py-3 text-xs font-bold uppercase tracking-wider text-slate-950 transition-all hover:brightness-105 disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
           >
             <Send size={15} />
             <span className="hidden sm:inline">Ask Copilot</span>

@@ -228,13 +228,13 @@ export function TimeEstimationPanel({ initialSection = 'forecaster', hideHeaderT
 
         {/* View Switcher Tabs */}
         {!hideHeaderTabs && (
-          <div className="flex items-center gap-1.5 bg-black/50 border border-white/10 rounded-lg p-1 text-xs self-start sm:self-auto">
+          <div className="flex items-center gap-1.5 bg-[var(--bg-raised)] border border-[var(--border-default)] rounded-lg p-1 text-xs self-start sm:self-auto">
             <button
               onClick={() => setActiveSection('forecaster')}
               className={`px-3 py-1.5 rounded-md transition-all flex items-center gap-1.5 ${
                 activeSection === 'forecaster'
                   ? 'bg-amber-400 text-black shadow-md shadow-amber-500/25 font-extrabold'
-                  : 'text-zinc-400 hover:text-white hover:bg-white/10 font-medium'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] font-medium'
               }`}
             >
               <Gauge size={13} />
@@ -246,7 +246,7 @@ export function TimeEstimationPanel({ initialSection = 'forecaster', hideHeaderT
               className={`px-3 py-1.5 rounded-md transition-all flex items-center gap-1.5 ${
                 activeSection === 'simulator'
                   ? 'bg-amber-400 text-black shadow-md shadow-amber-500/25 font-extrabold'
-                  : 'text-zinc-400 hover:text-white hover:bg-white/10 font-medium'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] font-medium'
               }`}
             >
               <Sliders size={13} />
@@ -258,7 +258,7 @@ export function TimeEstimationPanel({ initialSection = 'forecaster', hideHeaderT
               className={`px-3 py-1.5 rounded-md transition-all flex items-center gap-1.5 ${
                 activeSection === 'schedule'
                   ? 'bg-amber-400 text-black shadow-md shadow-amber-500/25 font-extrabold'
-                  : 'text-zinc-400 hover:text-white hover:bg-white/10 font-medium'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] font-medium'
               }`}
             >
               <CalendarCheck size={13} />
@@ -275,7 +275,7 @@ export function TimeEstimationPanel({ initialSection = 'forecaster', hideHeaderT
       {activeSection === 'forecaster' && (
         <div className="space-y-6 fade-up">
           {/* Main Hero Forecaster Card */}
-          <div className="relative overflow-hidden rounded-xl border border-yellow-500/20 bg-gradient-to-br from-yellow-950/20 via-black/60 to-black/80 p-6 shadow-2xl backdrop-blur-md">
+          <div className="relative overflow-hidden rounded-xl border border-yellow-500/30 bg-[var(--bg-surface)] p-6 shadow-xl">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-white/5">
               <div>
                 <div className="flex items-center gap-2 mb-1">
@@ -292,7 +292,7 @@ export function TimeEstimationPanel({ initialSection = 'forecaster', hideHeaderT
               </div>
 
               {/* ETA Readout Clock */}
-              <div className="flex items-center gap-4 bg-black/50 border border-white/10 rounded-xl px-5 py-3 shadow-inner">
+              <div className="flex items-center gap-4 bg-[var(--bg-raised)] border border-[var(--border-default)] rounded-xl px-5 py-3 shadow-inner">
                 <Clock size={28} className="text-yellow-400 animate-pulse" />
                 <div>
                   <div className="text-[11px] uppercase tracking-wider text-[var(--text-muted)]">{t('estimated_completion')}</div>
@@ -314,7 +314,7 @@ export function TimeEstimationPanel({ initialSection = 'forecaster', hideHeaderT
                 </span>
                 <span className="font-mono font-bold text-yellow-400 text-sm">{live.progress_pct}%</span>
               </div>
-              <div className="h-3 w-full bg-zinc-800/80 rounded-full overflow-hidden p-0.5 border border-white/5">
+              <div className="h-3 w-full bg-[var(--bg-elevated)] rounded-full overflow-hidden p-0.5 border border-[var(--border-subtle)]">
                 <div
                   className="h-full bg-gradient-to-r from-yellow-500 via-amber-400 to-yellow-300 rounded-full transition-all duration-700 shadow-sm"
                   style={{ width: `${Math.min(100, Math.max(2, live.progress_pct))}%` }}
@@ -324,35 +324,35 @@ export function TimeEstimationPanel({ initialSection = 'forecaster', hideHeaderT
 
             {/* Metrics Breakdown Bar */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
-              <div className="bg-black/30 border border-white/5 rounded-lg p-3">
+              <div className="bg-[var(--bg-raised)] border border-[var(--border-subtle)] rounded-lg p-3">
                 <div className="text-[10px] uppercase text-[var(--text-muted)]">{t('standard_baseline')}</div>
-                <div className="text-lg font-mono font-bold text-zinc-300">{formatMin(live.estimated_baseline_min)}</div>
-                <div className="text-[10px] text-zinc-500">Planned duration</div>
+                <div className="text-lg font-mono font-bold text-[var(--text-primary)]">{formatMin(live.estimated_baseline_min)}</div>
+                <div className="text-[10px] text-[var(--text-muted)]">Planned duration</div>
               </div>
 
-              <div className="bg-black/30 border border-white/5 rounded-lg p-3">
+              <div className="bg-[var(--bg-raised)] border border-[var(--border-subtle)] rounded-lg p-3">
                 <div className="text-[10px] uppercase text-[var(--text-muted)]">{t('catboost_forecast')}</div>
-                <div className="text-lg font-mono font-bold text-yellow-400">{formatMin(live.predicted_time_min)}</div>
-                <div className="text-[10px] text-yellow-500/80">ML-adjusted total</div>
+                <div className="text-lg font-mono font-bold text-[var(--yellow)]">{formatMin(live.predicted_time_min)}</div>
+                <div className="text-[10px] text-[var(--text-brand)]">ML-adjusted total</div>
               </div>
 
-              <div className="bg-black/30 border border-white/5 rounded-lg p-3">
+              <div className="bg-[var(--bg-raised)] border border-[var(--border-subtle)] rounded-lg p-3">
                 <div className="text-[10px] uppercase text-[var(--text-muted)]">{t('variance_vs_plan')}</div>
                 <div className={`text-lg font-mono font-bold ${
-                  live.predicted_time_min - live.estimated_baseline_min <= 0 ? 'text-emerald-400' : 'text-amber-400'
+                  live.predicted_time_min - live.estimated_baseline_min <= 0 ? 'text-[var(--green)]' : 'text-[var(--yellow)]'
                 }`}>
                   {live.predicted_time_min - live.estimated_baseline_min >= 0 ? '+' : ''}
                   {(live.predicted_time_min - live.estimated_baseline_min).toFixed(1)}m
                 </div>
-                <div className="text-[10px] text-zinc-500">
+                <div className="text-[10px] text-[var(--text-muted)]">
                   {(((live.predicted_time_min - live.estimated_baseline_min) / Math.max(1, live.estimated_baseline_min)) * 100).toFixed(1)}% shift
                 </div>
               </div>
 
-              <div className="bg-black/30 border border-white/5 rounded-lg p-3">
+              <div className="bg-[var(--bg-raised)] border border-[var(--border-subtle)] rounded-lg p-3">
                 <div className="text-[10px] uppercase text-[var(--text-muted)]">{t('schedule_health')}</div>
                 <div className="mt-1">{getRiskBadge(live.delay_risk_level)}</div>
-                <div className="text-[10px] text-zinc-500 mt-1">Live queue status</div>
+                <div className="text-[10px] text-[var(--text-muted)] mt-1">Live queue status</div>
               </div>
             </div>
           </div>
@@ -379,10 +379,10 @@ export function TimeEstimationPanel({ initialSection = 'forecaster', hideHeaderT
                           <div className="text-xs text-[var(--text-muted)]">{f.impact}</div>
                         </div>
                       </div>
-                      <span className={`font-mono text-sm font-bold px-2 py-0.5 rounded ${
-                        f.severity === 'positive' ? 'text-emerald-400 bg-emerald-950/40 border border-emerald-500/30' :
-                        f.severity === 'critical' ? 'text-rose-400 bg-rose-950/40 border border-rose-500/30' :
-                        'text-amber-400 bg-amber-950/40 border border-amber-500/30'
+                      <span className={`font-mono text-xs font-bold px-2 py-0.5 rounded ${
+                        f.severity === 'positive' ? 'chip chip-green' :
+                        f.severity === 'critical' ? 'chip chip-red' :
+                        'chip chip-yellow'
                       }`}>
                         {f.effect}
                       </span>
@@ -476,31 +476,31 @@ export function TimeEstimationPanel({ initialSection = 'forecaster', hideHeaderT
                 <div className="flex flex-wrap gap-2">
                   <button
                     onClick={() => applyPreset('optimum')}
-                    className="px-2.5 py-1 text-xs rounded-md bg-zinc-800/80 hover:bg-emerald-950/60 border border-emerald-500/30 text-emerald-300 transition-all font-medium"
+                    className="px-2.5 py-1 text-xs rounded-md bg-[var(--bg-raised)] hover:bg-[var(--green-dim)] border border-[var(--green-border)] text-[var(--green)] transition-all font-medium"
                   >
                     {t('optimum_run_btn')}
                   </button>
                   <button
                     onClick={() => applyPreset('mud_rain')}
-                    className="px-2.5 py-1 text-xs rounded-md bg-zinc-800/80 hover:bg-blue-950/60 border border-blue-500/30 text-blue-300 transition-all font-medium"
+                    className="px-2.5 py-1 text-xs rounded-md bg-[var(--bg-raised)] hover:bg-[var(--blue-dim)] border border-[var(--blue-border)] text-[var(--blue)] transition-all font-medium"
                   >
                     {t('muddy_terrain_rain')}
                   </button>
                   <button
                     onClick={() => applyPreset('permit_hold')}
-                    className="px-2.5 py-1 text-xs rounded-md bg-zinc-800/80 hover:bg-amber-950/60 border border-amber-500/30 text-amber-300 transition-all font-medium"
+                    className="px-2.5 py-1 text-xs rounded-md bg-[var(--bg-raised)] hover:bg-[var(--yellow-dim)] border border-[var(--yellow-border)] text-[var(--yellow)] transition-all font-medium"
                   >
                     {t('severe_permit_hold')}
                   </button>
                   <button
                     onClick={() => applyPreset('rock_quarry')}
-                    className="px-2.5 py-1 text-xs rounded-md bg-zinc-800/80 hover:bg-purple-950/60 border border-purple-500/30 text-purple-300 transition-all font-medium"
+                    className="px-2.5 py-1 text-xs rounded-md bg-[var(--bg-raised)] hover:bg-purple-500/10 border border-purple-500/30 text-purple-400 transition-all font-medium"
                   >
                     {t('rock_excavation_btn')}
                   </button>
                   <button
                     onClick={() => applyPreset('breakdown_crisis')}
-                    className="px-2.5 py-1 text-xs rounded-md bg-zinc-800/80 hover:bg-rose-950/60 border border-rose-500/30 text-rose-300 transition-all font-medium"
+                    className="px-2.5 py-1 text-xs rounded-md bg-[var(--bg-raised)] hover:bg-[var(--red-dim)] border border-[var(--red-border)] text-[var(--red)] transition-all font-medium"
                   >
                     {t('breakdown_crisis_btn')}
                   </button>
@@ -736,17 +736,17 @@ export function TimeEstimationPanel({ initialSection = 'forecaster', hideHeaderT
 
           {/* Real-time Prediction Output Scorecard (5 cols) */}
           <div className="lg:col-span-5 space-y-6">
-            <div className="rounded-xl border border-yellow-500/30 bg-gradient-to-b from-yellow-950/30 via-zinc-950/80 to-black p-6 shadow-2xl relative">
+            <div className="rounded-xl border border-yellow-500/30 bg-[var(--bg-surface)] p-6 shadow-xl relative">
               <div className="flex justify-between items-start mb-4">
                 <div>
                   <span className="chip chip-zinc font-mono text-[10px]">CatBoost ML Inference</span>
-                  <h3 className="text-lg font-bold text-white mt-1">Predicted Completion Time</h3>
+                  <h3 className="text-lg font-bold text-[var(--text-primary)] mt-1">Predicted Completion Time</h3>
                 </div>
                 {getRiskBadge(currentPrediction.delay_risk_level)}
               </div>
 
               {/* Large Glowing Readout */}
-              <div className="bg-black/60 border border-white/10 rounded-xl p-5 my-4 text-center">
+              <div className="bg-[var(--bg-raised)] border border-[var(--border-default)] rounded-xl p-5 my-4 text-center">
                 <div className="text-4xl sm:text-5xl font-mono font-bold text-yellow-400 tracking-tight">
                   {formatMin(currentPrediction.predicted_time_min)}
                 </div>
