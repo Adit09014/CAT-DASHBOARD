@@ -1,27 +1,42 @@
 {
-  "model_version": "RandomForestRegressor-v1.2",
-  "algorithm": "RandomForestRegressor",
+  "model_version": "CatBoostRegressor-v1.0",
+  "algorithm": "CatBoostRegressor",
+  "dataset": "synthetic_task_time_data.csv",
+  "training_samples": 5600,
+  "test_samples": 1200,
   "features": [
-    "machine_age",
-    "baseline_duration",
-    "idle_reduction",
-    "task_type_Excavation",
-    "task_type_Grading",
-    "task_type_Loading",
-    "task_type_Material movement",
-    "weather_Clear",
-    "weather_Cloudy",
-    "weather_Rain",
-    "weather_Sunny",
-    "weather_Windy",
-    "operator_skill_Beginner",
-    "operator_skill_Expert",
-    "operator_skill_Intermediate"
+    "Task_Type",
+    "Task_Area_sqm",
+    "Material_Type",
+    "Ground_Condition",
+    "Ground_Slope_deg",
+    "Site_Distance_km",
+    "Weather",
+    "Temperature_C",
+    "Crew_Size",
+    "Operator_Skill",
+    "Operator_Experience_Months",
+    "Machine_Age_yrs",
+    "Machine_Condition",
+    "Permit_Setup_Delay_min",
+    "Breakdown_Occurred",
+    "Estimated_Time_min",
+    "month",
+    "day_of_week"
+  ],
+  "categorical_features": [
+    "Task_Type",
+    "Material_Type",
+    "Ground_Condition",
+    "Weather",
+    "Operator_Skill",
+    "Machine_Condition",
+    "Breakdown_Occurred"
   ],
   "metrics": {
-    "mae": 2.5,
-    "rmse": 3.11,
-    "r2": 0.9268
-  },
-  "trained_samples": 1500
+    "mae": 16.49,
+    "rmse": 24.92,
+    "r2": 0.985,
+    "mape_percent": 5.89
+  }
 }

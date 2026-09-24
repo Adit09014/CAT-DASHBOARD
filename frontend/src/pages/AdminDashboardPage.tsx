@@ -15,33 +15,40 @@ import {
   CheckCircle2,
   ChevronRight,
   TriangleAlert,
+  Clock,
 } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../services/auth';
 import { Panel } from '../components/Panel';
 import { MetricCard } from '../components/MetricCard';
 import { StatusBadge } from '../components/StatusBadge';
+import { AnomalySentinelPanel } from '../components/AnomalySentinelPanel';
+import { TimeEstimationPanel } from '../components/TimeEstimationPanel';
+import { useLanguage } from '../services/i18n';
+import { LanguageSelector } from '../components/LanguageSelector';
 
-type AdminTab = 'overview' | 'sentinel' | 'dispatch' | 'fleet' | 'operators' | 'tasks' | 'safety';
-
-const navItems: { id: AdminTab; label: string; icon: React.ReactNode }[] = [
-  { id: 'overview',   label: 'Overview',       icon: <LayoutDashboard size={15} /> },
-  { id: 'sentinel',   label: 'Safety Sentinel', icon: <TriangleAlert size={15} /> },
-  { id: 'dispatch',   label: 'AI Dispatch',     icon: <Sparkles size={15} /> },
-  { id: 'fleet',      label: 'Fleet',           icon: <Truck size={15} /> },
-  { id: 'operators',  label: 'Operators',       icon: <Users size={15} /> },
-  { id: 'tasks',      label: 'Work Orders',     icon: <CalendarCheck size={15} /> },
-  { id: 'safety',     label: 'Compliance',      icon: <ShieldAlert size={15} /> },
-];
+type AdminTab = 'overview' | 'duration' | 'sentinel' | 'dispatch' | 'fleet' | 'operators' | 'tasks' | 'safety';
 
 export function AdminDashboardPage() {
   const { logout } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab]           = useState<AdminTab>('overview');
   const [selectedTaskId, setSelectedTaskId] = useState<number>(1);
   const [assignmentResult, setAssignmentResult] = useState<string | null>(null);
   const [assigning, setAssigning]           = useState(false);
+
+  const navItems: { id: AdminTab; label: string; icon: React.ReactNode }[] = [
+    { id: 'overview',   label: t('tab_overview', 'Overview'),               icon: <LayoutDashboard size={15} /> },
+    { id: 'duration',   label: t('tab_duration', 'Time Forecaster'),       icon: <Clock size={15} /> },
+    { id: 'sentinel',   label: t('tab_alerts', 'Safety Sentinel'),         icon: <TriangleAlert size={15} /> },
+    { id: 'dispatch',   label: 'AI Dispatch',                              icon: <Sparkles size={15} /> },
+    { id: 'fleet',      label: t('tab_fleet', 'Fleet'),                    icon: <Truck size={15} /> },
+    { id: 'operators',  label: t('operator', 'Operators'),                 icon: <Users size={15} /> },
+    { id: 'tasks',      label: t('tab_tasks', 'Work Orders'),              icon: <CalendarCheck size={15} /> },
+    { id: 'safety',     label: 'Compliance',                               icon: <ShieldAlert size={15} /> },
+  ];
 
   const operators    = useQuery({ queryKey: ['admin-operators'],    queryFn: async () => (await api.get('/admin/operators')).data });
   const machines     = useQuery({ queryKey: ['admin-machines'],     queryFn: async () => (await api.get('/admin/machines')).data });
@@ -97,12 +104,20 @@ export function AdminDashboardPage() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => navigate('/alerts')}
+            onClick={() => setActiveTab('duration')}
+            className="btn btn-secondary gap-1.5 text-xs border-yellow-500/40 text-yellow-300 hover:border-yellow-400 bg-yellow-950/20"
+            title="Open Fleet Task Completion Forecaster"
+          >
+            <Clock size={12} className="text-yellow-400" />
+            <span className="hidden sm:inline">{t('tab_duration', 'Time Forecaster')}</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('sentinel')}
             className="btn btn-secondary gap-1.5 text-xs border-rose-500/40 text-rose-300 hover:border-rose-400"
             title="Open Safety Sentinel Anomaly & Hazard Center"
           >
             <TriangleAlert size={12} className="text-rose-400 animate-pulse" />
-            <span className="hidden sm:inline">Safety Sentinel</span>
+            <span className="hidden sm:inline">{t('tab_alerts', 'Safety Sentinel')}</span>
             <span className="chip chip-red text-[9px] py-0 px-1 font-bold">
               {anomalyAlerts.data?.length || 0} Alerts
             </span>
@@ -111,7 +126,10 @@ export function AdminDashboardPage() {
             <RefreshCcw size={12} />
             <span className="hidden sm:inline">Sync Fleet</span>
           </button>
-          <button onClick={() => logout()} className="btn btn-ghost">
+          
+          <LanguageSelector />
+
+          <button onClick={() => logout()} className="btn btn-ghost" title={t('sign_out', 'Sign Out')}>
             <LogOut size={13} />
           </button>
         </div>
@@ -136,13 +154,7 @@ export function AdminDashboardPage() {
                 return (
                   <button
                     key={item.id}
-                    onClick={() => {
-                      if (item.id === 'sentinel') {
-                        navigate('/alerts');
-                      } else {
-                        setActiveTab(item.id);
-                      }
-                    }}
+                    onClick={() => setActiveTab(item.id)}
                     className={`nav-item ${isActive ? 'active' : ''}`}
                   >
                     <div className="nav-item-left">
@@ -262,7 +274,7 @@ export function AdminDashboardPage() {
 
                 <div className="flex items-center gap-2 self-start md:self-auto">
                   <button
-                    onClick={() => navigate('/alerts')}
+                    onClick={() => setActiveTab('sentinel')}
                     className="btn btn-secondary text-xs py-1.5 px-3 flex items-center gap-1.5 hover:border-[var(--cat-yellow)]"
                   >
                     <span>Open Safety Sentinel</span>
@@ -271,8 +283,24 @@ export function AdminDashboardPage() {
                 </div>
               </div>
 
-              <div className="grid gap-4 lg:grid-cols-2">
-                <div onClick={() => setActiveTab('dispatch')} className="jump-card border-[var(--yellow-border)] bg-[var(--yellow-dim)]">
+              <div className="grid gap-4 md:grid-cols-3">
+                <div onClick={() => setActiveTab('duration')} className="jump-card border-yellow-500/30 bg-yellow-950/10 hover:border-yellow-400 transition-all cursor-pointer">
+                  <div className="flex items-start justify-between">
+                    <div className="jump-card-icon bg-yellow-500/20">
+                      <Clock size={18} className="text-yellow-400" />
+                    </div>
+                    <span className="chip chip-yellow text-[9px] py-0.5">CATBOOST ML</span>
+                  </div>
+                  <h3 className="mt-3 text-sm font-semibold text-[var(--text-primary)]">Time Forecaster</h3>
+                  <p className="mt-1 text-xs text-[var(--text-secondary)] leading-relaxed">
+                    Fleet mission duration predictions, CatBoost 8k benchmarks, and delay drivers.
+                  </p>
+                  <div className="mt-3 flex items-center gap-1 text-xs text-yellow-400">
+                    Open Forecaster <ChevronRight size={13} />
+                  </div>
+                </div>
+
+                <div onClick={() => setActiveTab('dispatch')} className="jump-card border-[var(--yellow-border)] bg-[var(--yellow-dim)] cursor-pointer">
                   <div className="flex items-start justify-between">
                     <div className="jump-card-icon bg-[rgba(245,166,35,0.2)]">
                       <Sparkles size={18} className="text-[var(--yellow)]" />
@@ -301,6 +329,20 @@ export function AdminDashboardPage() {
                   </p>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* TIME COMPLETION FORECASTER */}
+          {activeTab === 'duration' && (
+            <div className="fade-up">
+              <TimeEstimationPanel />
+            </div>
+          )}
+
+          {/* SAFETY SENTINEL / ANOMALY DETECTION */}
+          {activeTab === 'sentinel' && (
+            <div className="fade-up">
+              <AnomalySentinelPanel />
             </div>
           )}
 

@@ -207,6 +207,50 @@ class AnomalyPredictResponse(BaseModel):
     top_risk_contributors: list[dict[str, Any]] = Field(default_factory=list)
 
 
+class NarrativeFeatureAttribution(BaseModel):
+    feature: str
+    observed_value: str | float
+    safe_limit: str | float
+    contribution_weight: float
+    impact_level: str
+    description: str
+
+
+class NarrativeSOPAction(BaseModel):
+    step: int
+    action: str
+    urgency: str
+    target_role: str
+    safety_rule: str
+
+
+class ExplainableNarrativeAlert(BaseModel):
+    alert_id: int | None = None
+    headline: str
+    threat_level: str
+    confidence_pct: float
+    summary_narrative: str
+    detailed_analysis: str
+    causal_chain: list[str] = Field(default_factory=list)
+    feature_attributions: list[NarrativeFeatureAttribution] = Field(default_factory=list)
+    immediate_sop_actions: list[NarrativeSOPAction] = Field(default_factory=list)
+    preventive_measures: list[str] = Field(default_factory=list)
+    audio_briefing_text: str
+    machine_code: str = "EXC-001"
+    timestamp: str | None = None
+    acknowledged: bool | None = False
+
+
+class NarrativeGenerateRequest(BaseModel):
+    telemetry: dict[str, Any] = Field(default_factory=dict)
+    alert_type: str | None = None
+    threat_level: str | None = None
+    confidence: float | None = None
+    lang: str = "en"
+    machine_code: str = "EXC-001"
+    operator_name: str = "Operator"
+
+
 class AnomalyAlertItem(BaseModel):
     id: int
     operator_id: int | None = None
@@ -219,6 +263,7 @@ class AnomalyAlertItem(BaseModel):
     acknowledged: bool
     explanation: dict[str, Any]
     created_at: str
+    narrative: ExplainableNarrativeAlert | None = None
 
 
 class DatasetStatsResponse(BaseModel):
@@ -246,3 +291,93 @@ class DashboardResponse(BaseModel):
     what_if: dict[str, Any]
     weather: dict[str, Any]
     anomaly_status: dict[str, Any] | None = None
+
+
+class TimeEstimatePredictRequest(BaseModel):
+    task_type: str = "Material_Loading"
+    task_area_sqm: float = 200.0
+    material_type: str = "Soil"
+    ground_condition: str = "Normal"
+    ground_slope_deg: float = 4.0
+    site_distance_km: float = 2.5
+    weather: str = "Sunny"
+    temperature_c: float = 24.0
+    crew_size: int = 3
+    operator_skill: str = "Intermediate"
+    operator_experience_months: int = 48
+    machine_age_yrs: float = 5.0
+    machine_condition: str = "Good"
+    permit_setup_delay_min: float = 0.0
+    breakdown_occurred: str = "No"
+    estimated_time_min: float = 180.0
+    month: int | None = None
+    day_of_week: int | None = None
+
+
+class TimeEstimatePredictResponse(BaseModel):
+    predicted_time_min: float
+    estimated_baseline_min: float
+    delta_min: float
+    delta_pct: float
+    delay_risk_level: str
+    eta_timestamp: str
+    factor_contributions: list[dict[str, Any]] = Field(default_factory=list)
+    model_metrics: dict[str, Any] = Field(default_factory=dict)
+
+
+class TimeEstimateLiveResponse(BaseModel):
+    task_id: int | None = None
+    task_code: str = "T1001"
+    task_type: str = "Material_Loading"
+    status: str = "in_progress"
+    scheduled_at: str
+    elapsed_time_min: float
+    estimated_baseline_min: float
+    predicted_time_min: float
+    remaining_time_min: float
+    progress_pct: float
+    delay_risk_level: str
+    eta_timestamp: str
+    factor_contributions: list[dict[str, Any]] = Field(default_factory=list)
+    task_attributes: dict[str, Any] = Field(default_factory=dict)
+
+
+class TimeDatasetStatsResponse(BaseModel):
+    total_tasks: int
+    avg_actual_time_min: float
+    avg_estimated_time_min: float
+    avg_delay_min: float
+    avg_permit_delay_min: float
+    breakdown_rate_pct: float
+    mean_time_by_task_type: dict[str, float]
+    mean_time_by_material: dict[str, float]
+    mean_time_by_ground: dict[str, float]
+    mean_time_by_weather: dict[str, float]
+    catboost_metrics: dict[str, Any]
+    model_benchmarks: list[dict[str, Any]]
+
+
+class TimeDatasetSampleItem(BaseModel):
+    task_id: str
+    task_date: str
+    machine_id: str
+    operator_id: str
+    task_type: str
+    task_area_sqm: float
+    material_type: str
+    ground_condition: str
+    ground_slope_deg: float
+    site_distance_km: float
+    weather: str
+    temperature_c: float
+    crew_size: int
+    operator_skill: str
+    operator_experience_months: int
+    machine_age_yrs: float
+    machine_condition: str
+    permit_setup_delay_min: float
+    breakdown_occurred: str
+    estimated_time_min: float
+    actual_time_min: float
+    delay_min: float
+

@@ -232,8 +232,44 @@ def anomaly_simulate_endpoint(payload: AnomalySimulateRequest, user: User = Depe
 
 
 @app.get("/anomaly/alerts", response_model=list[AnomalyAlertItem])
-def anomaly_alerts_endpoint(severity: str | None = None, operator_id: int | None = None, limit: int = 50, user: User = Depends(current_user), db: Session = Depends(get_db)) -> list[AnomalyAlertItem]:
-    return [AnomalyAlertItem(**item) for item in list_anomaly_alerts(db, operator_id=operator_id, limit=limit, severity=severity)]
+def anomaly_alerts_endpoint(
+    severity: str | None = None,
+    operator_id: int | None = None,
+    limit: int = 50,
+    lang: str = "en",
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+) -> list[AnomalyAlertItem]:
+    return [AnomalyAlertItem(**item) for item in list_anomaly_alerts(db, operator_id=operator_id, limit=limit, severity=severity, lang=lang)]
+
+
+@app.get("/anomaly/alerts/{alert_id}/narrative", response_model=ExplainableNarrativeAlert)
+def anomaly_alert_narrative_endpoint(
+    alert_id: int,
+    lang: str = "en",
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+) -> ExplainableNarrativeAlert:
+    narrative = get_alert_narrative(db, alert_id, lang=lang)
+    if not narrative:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert not found")
+    return ExplainableNarrativeAlert(**narrative)
+
+
+@app.post("/anomaly/narrative/generate", response_model=ExplainableNarrativeAlert)
+def anomaly_generate_narrative_endpoint(
+    payload: NarrativeGenerateRequest,
+    user: User = Depends(current_user),
+) -> ExplainableNarrativeAlert:
+    narrative = build_explainable_narrative(
+        anomaly_type=payload.alert_type or "SAFETY_ANOMALY",
+        severity=payload.threat_level or "CRITICAL",
+        confidence=payload.confidence or 0.88,
+        telemetry_dict=payload.telemetry,
+        lang=payload.lang or "en",
+        machine_code=payload.machine_code or "EXC-001",
+    )
+    return ExplainableNarrativeAlert(**narrative)
 
 
 @app.post("/anomaly/alerts/{alert_id}/acknowledge")
@@ -249,4 +285,29 @@ def anomaly_dataset_stats_endpoint(user: User = Depends(current_user)) -> Datase
 @app.get("/anomaly/dataset-sample")
 def anomaly_dataset_sample_endpoint(limit: int = 30, alert_only: bool = False, user: User = Depends(current_user)):
     return get_dataset_sample(limit=limit, alert_only=alert_only)
+
+
+@app.get("/time-estimation/live", response_model=TimeEstimateLiveResponse)
+def time_estimation_live_endpoint(user: User = Depends(current_user), db: Session = Depends(get_db)) -> TimeEstimateLiveResponse:
+    res = get_time_estimation_live(db, user.id)
+    return TimeEstimateLiveResponse(**res)
+
+
+@app.post("/time-estimation/predict", response_model=TimeEstimatePredictResponse)
+def time_estimation_predict_endpoint(payload: TimeEstimatePredictRequest, user: User = Depends(current_user)) -> TimeEstimatePredictResponse:
+    res = predict_task_time_catboost(payload.model_dump())
+    return TimeEstimatePredictResponse(**res)
+
+
+@app.get("/time-estimation/dataset-stats", response_model=TimeDatasetStatsResponse)
+def time_estimation_dataset_stats_endpoint(user: User = Depends(current_user)) -> TimeDatasetStatsResponse:
+    res = get_time_dataset_statistics()
+    return TimeDatasetStatsResponse(**res)
+
+
+@app.get("/time-estimation/dataset-sample", response_model=list[TimeDatasetSampleItem])
+def time_estimation_dataset_sample_endpoint(limit: int = 30, task_type: str | None = None, user: User = Depends(current_user)) -> list[TimeDatasetSampleItem]:
+    records = get_time_dataset_sample(limit=limit, task_type=task_type)
+    return [TimeDatasetSampleItem(**r) for r in records]
+
 

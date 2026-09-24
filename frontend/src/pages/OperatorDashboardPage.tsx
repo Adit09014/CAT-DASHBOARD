@@ -20,6 +20,7 @@ import {
   TriangleAlert,
   CheckCircle2,
   ShieldAlert,
+  Sparkles,
 } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../services/auth';
@@ -33,25 +34,35 @@ import { PredictiveSafetyMap } from '../components/PredictiveSafetyMap';
 import { DomainGuardTraining } from '../components/DomainGuardTraining';
 import { CopilotPanel } from '../components/CopilotPanel';
 import { FullDayWeatherCard } from '../components/FullDayWeatherCard';
+import { AnomalySentinelPanel } from '../components/AnomalySentinelPanel';
+import { TimeEstimationPanel } from '../components/TimeEstimationPanel';
+import { useLanguage } from '../services/i18n';
+import { LanguageSelector } from '../components/LanguageSelector';
+import { ExplainableNarrativeAlertModal, ExplainableNarrativeAlert } from '../components/ExplainableNarrativeAlertModal';
 
-type OperatorTab = 'overview' | 'alerts' | 'safety-gate' | 'telemetry' | 'what-if' | 'proximity' | 'training' | 'copilot';
-
-const navItems = [
-  { id: 'overview'    as OperatorTab, label: 'Overview',       icon: <Layers size={15} /> },
-  { id: 'alerts'      as OperatorTab, label: 'Safety Sentinel', icon: <TriangleAlert size={15} /> },
-  { id: 'safety-gate' as OperatorTab, label: 'Safety Gate',    icon: <ShieldCheck size={15} /> },
-  { id: 'telemetry'  as OperatorTab, label: 'Telemetry',       icon: <Activity size={15} /> },
-  { id: 'what-if'    as OperatorTab, label: 'What-If Sim',     icon: <Sliders size={15} /> },
-  { id: 'proximity'  as OperatorTab, label: 'Proximity Radar', icon: <Compass size={15} /> },
-  { id: 'training'   as OperatorTab, label: 'Training',        icon: <Award size={15} /> },
-  { id: 'copilot'    as OperatorTab, label: 'AI Copilot',      icon: <Bot size={15} /> },
-];
+type OperatorTab = 'overview' | 'duration' | 'alerts' | 'safety-gate' | 'telemetry' | 'what-if' | 'proximity' | 'training' | 'copilot';
 
 export function OperatorDashboardPage() {
   const { user, logout } = useAuth();
+  const { t, currentLang } = useLanguage();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<OperatorTab>('overview');
+  const [copilotQuestion, setCopilotQuestion] = useState<string | undefined>(undefined);
+  const [overviewNarrativeAlert, setOverviewNarrativeAlert] = useState<ExplainableNarrativeAlert | null>(null);
+  const [isOverviewNarrativeOpen, setIsOverviewNarrativeOpen] = useState(false);
+
+  const navItems = [
+    { id: 'overview'    as OperatorTab, label: t('tab_overview', 'Overview'),               icon: <Layers size={15} /> },
+    { id: 'duration'    as OperatorTab, label: t('tab_duration', 'Time Forecaster'),       icon: <Clock size={15} /> },
+    { id: 'alerts'      as OperatorTab, label: t('tab_alerts', 'Safety Sentinel'),         icon: <TriangleAlert size={15} /> },
+    { id: 'safety-gate' as OperatorTab, label: t('tab_safety_gate', 'Safety Gate'),         icon: <ShieldCheck size={15} /> },
+    { id: 'telemetry'   as OperatorTab, label: t('tab_telemetry', 'Telemetry'),             icon: <Activity size={15} /> },
+    { id: 'what-if'     as OperatorTab, label: t('tab_what_if', 'What-If Sim'),             icon: <Sliders size={15} /> },
+    { id: 'proximity'   as OperatorTab, label: t('tab_proximity', 'Proximity Radar'),       icon: <Compass size={15} /> },
+    { id: 'training'    as OperatorTab, label: t('tab_training', 'Training'),               icon: <Award size={15} /> },
+    { id: 'copilot'     as OperatorTab, label: t('tab_copilot', 'AI Copilot'),             icon: <Bot size={15} /> },
+  ];
 
   const dashboardQuery = useQuery({
     queryKey: ['operator-dashboard'],
@@ -93,6 +104,23 @@ export function OperatorDashboardPage() {
 
   const safetyState = safety.allowed === false ? 'red' : safety.warnings?.length ? 'amber' : 'green';
 
+  const handleExplainOverviewHazard = async () => {
+    try {
+      const res = await api.post('/anomaly/narrative/generate', {
+        telemetry: telemetry,
+        alert_type: threatLevel === 'CRITICAL' ? 'SAFETY_ML_CRITICAL_BREACH' : 'SAFETY_ML_ELEVATED_RISK',
+        threat_level: threatLevel,
+        confidence: alertProb,
+        lang: currentLang,
+        machine_code: currentMachine.machine_code || 'EXC-001',
+      });
+      setOverviewNarrativeAlert(res.data);
+      setIsOverviewNarrativeOpen(true);
+    } catch (e) {
+      console.error('Failed to generate overview narrative:', e);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)] flex flex-col">
 
@@ -111,12 +139,21 @@ export function OperatorDashboardPage() {
               {currentTask.task_type || 'Excavation'} · {user?.name || 'Avery Stone'}
             </span>
           </div>
-          <StatusBadge state={safetyState} label={safety.allowed === false ? 'Gate Blocked' : 'Gate Clear'} />
+          <StatusBadge state={safetyState} label={safety.allowed === false ? t('gate_blocked', 'Gate Blocked') : t('gate_clear', 'Gate Clear')} />
         </div>
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => navigate('/alerts')}
+            onClick={() => setActiveTab('duration')}
+            className="btn text-[11px] gap-1.5 border border-yellow-500/40 text-yellow-300 hover:border-yellow-400 bg-yellow-950/20"
+            title="Open Task Time Completion Forecaster"
+          >
+            <Clock size={12} className="text-yellow-400" />
+            <span className="hidden sm:inline">{t('tab_duration', 'Time Forecaster')}</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('alerts')}
             className={`btn text-[11px] gap-1.5 border transition-all ${
               isSafetyAlert
                 ? 'bg-rose-950/50 border-rose-500/50 text-rose-300 animate-pulse'
@@ -127,7 +164,7 @@ export function OperatorDashboardPage() {
             title="Open Safety Sentinel Anomaly & Hazard Center"
           >
             <TriangleAlert size={12} className={isSafetyAlert ? 'text-rose-400' : threatLevel === 'ELEVATED' ? 'text-amber-400' : 'text-slate-400'} />
-            <span className="hidden sm:inline">Sentinel:</span>
+            <span className="hidden sm:inline">{t('tab_alerts', 'Sentinel')}:</span>
             <span className="font-bold">{threatLevel} ({(alertProb * 100).toFixed(0)}%)</span>
           </button>
 
@@ -137,12 +174,15 @@ export function OperatorDashboardPage() {
             title="Advance simulated telemetry tick"
           >
             <Activity size={12} />
-            <span className="hidden sm:inline">Advance Telemetry</span>
+            <span className="hidden sm:inline">{t('advance_telemetry', 'Advance Telemetry')}</span>
           </button>
+          
+          <LanguageSelector />
+
           <button onClick={refreshData} className="btn btn-ghost" title="Refresh">
             <RefreshCcw size={13} />
           </button>
-          <button onClick={() => logout()} className="btn btn-ghost" title="Logout">
+          <button onClick={() => logout()} className="btn btn-ghost" title={t('sign_out', 'Sign Out')}>
             <LogOut size={13} />
           </button>
         </div>
@@ -180,13 +220,7 @@ export function OperatorDashboardPage() {
                 return (
                   <button
                     key={item.id}
-                    onClick={() => {
-                      if (item.id === 'alerts') {
-                        navigate('/alerts');
-                      } else {
-                        setActiveTab(item.id);
-                      }
-                    }}
+                    onClick={() => setActiveTab(item.id)}
                     className={`nav-item ${isActive ? 'active' : ''}`}
                   >
                     <div className="nav-item-left">
@@ -346,8 +380,18 @@ export function OperatorDashboardPage() {
                       <span>{riskFactors[0].factor}</span>
                     </div>
                   )}
+
                   <button
-                    onClick={() => navigate('/alerts')}
+                    onClick={handleExplainOverviewHazard}
+                    className="btn btn-secondary text-xs py-1.5 px-3 flex items-center gap-1.5 border-amber-500/40 text-amber-300 hover:border-amber-400 hover:bg-amber-950/30 shadow"
+                    title="Inspect Explainable AI Hazard Narrative"
+                  >
+                    <Sparkles size={13} className="text-[var(--cat-yellow)]" />
+                    <span>{t('explain_alert', 'Explain Narrative')}</span>
+                  </button>
+
+                  <button
+                    onClick={() => setActiveTab('alerts')}
                     className="btn btn-secondary text-xs py-1.5 px-3 flex items-center gap-1.5 hover:border-[var(--cat-yellow)]"
                   >
                     <span>Open Sentinel Center</span>
@@ -357,10 +401,26 @@ export function OperatorDashboardPage() {
               </div>
 
               {/* Feature cards + task/insight */}
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <div
+                  onClick={() => setActiveTab('duration')}
+                  className="jump-card border-yellow-500/30 bg-yellow-950/10 hover:border-yellow-400 transition-all cursor-pointer"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="jump-card-icon bg-yellow-500/20">
+                      <Clock size={18} className="text-yellow-400" />
+                    </div>
+                    <span className="chip chip-yellow text-[9px] py-0.5">CATBOOST</span>
+                  </div>
+                  <h3 className="mt-3 text-sm font-semibold text-[var(--text-primary)]">Time Forecaster</h3>
+                  <p className="mt-1 text-xs text-[var(--text-secondary)] leading-relaxed">
+                    Live ETA clock, 8k dataset benchmarks, delay risk & terrain sensitivity.
+                  </p>
+                </div>
+
                 <div
                   onClick={() => setActiveTab('safety-gate')}
-                  className="jump-card"
+                  className="jump-card cursor-pointer"
                 >
                   <div className="flex items-start justify-between">
                     <div className="jump-card-icon bg-[var(--green-dim)]">
@@ -482,6 +542,25 @@ export function OperatorDashboardPage() {
             </div>
           )}
 
+          {/* TAB: TIME COMPLETION FORECASTER */}
+          {activeTab === 'duration' && (
+            <div className="fade-up">
+              <TimeEstimationPanel />
+            </div>
+          )}
+
+          {/* TAB: SAFETY SENTINEL / ANOMALY DETECTION */}
+          {activeTab === 'alerts' && (
+            <div className="fade-up">
+              <AnomalySentinelPanel
+                onNavigateToCopilot={(q) => {
+                  setCopilotQuestion(q);
+                  setActiveTab('copilot');
+                }}
+              />
+            </div>
+          )}
+
           {/* TAB: SAFETY GATE */}
           {activeTab === 'safety-gate' && (
             <div className="fade-up">
@@ -505,6 +584,10 @@ export function OperatorDashboardPage() {
                 engineLoad={telemetry.engine_load ?? 58.0}
                 loadCycles={telemetry.load_cycles ?? 26}
                 engineHours={telemetry.engine_hours ?? 131.5}
+                telemetry={telemetry}
+                machineCode={currentMachine?.machine_code || 'CAT-336D'}
+                operatorName={user?.name || 'Avery Stone'}
+                onAdvanceTick={handleAdvanceSimulation}
               />
             </div>
           )}
@@ -544,13 +627,24 @@ export function OperatorDashboardPage() {
               <CopilotPanel
                 machineCode={currentMachine.machine_code || 'EXC-001'}
                 taskType={currentTask.task_type || 'Excavation'}
-                initialMessage={insight.message}
+                initialMessage={copilotQuestion || insight.message}
               />
             </div>
           )}
 
         </main>
       </div>
+
+      {/* Explainable Narrative Alert Modal */}
+      <ExplainableNarrativeAlertModal
+        alert={overviewNarrativeAlert}
+        isOpen={isOverviewNarrativeOpen}
+        onClose={() => setIsOverviewNarrativeOpen(false)}
+        onAskCopilot={(q) => {
+          setCopilotQuestion(q);
+          setActiveTab('copilot');
+        }}
+      />
     </div>
   );
 }

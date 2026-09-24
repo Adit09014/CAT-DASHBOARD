@@ -20,6 +20,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { api } from '../services/api';
+import { useLanguage } from '../services/i18n';
 
 interface CopilotPanelProps {
   machineCode?: string;
@@ -41,6 +42,7 @@ export function CopilotPanel({
   taskType = 'Excavation',
   initialMessage,
 }: CopilotPanelProps) {
+  const { currentLang, t } = useLanguage();
   const [messages, setMessages] = useState<ChatMessage[]>(() => [
     {
       id: 'init-1',
@@ -133,6 +135,16 @@ export function CopilotPanel({
       }
 
       const utterance = new SpeechSynthesisUtterance(textToSpeak);
+      const langLocaleMap: Record<string, string> = {
+        es: 'es-ES',
+        fr: 'fr-FR',
+        de: 'de-DE',
+        hi: 'hi-IN',
+        zh: 'zh-CN',
+        pt: 'pt-BR',
+        en: 'en-US',
+      };
+      utterance.lang = langLocaleMap[currentLang] || 'en-US';
       utterance.rate = 1.0;
       utterance.pitch = 1.0;
       utterance.onend = () => {
@@ -166,8 +178,19 @@ export function CopilotPanel({
     setLoading(true);
 
     try {
+      const langInstructionMap: Record<string, string> = {
+        es: ' [Por favor responde en español]',
+        fr: ' [Veuillez répondre en français]',
+        de: ' [Bitte antworten Sie auf Deutsch]',
+        hi: ' [कृपया हिंदी में उत्तर दें]',
+        zh: ' [请用中文回答]',
+        pt: ' [Por favor responda em português]',
+      };
+      const langSuffix = langInstructionMap[currentLang] || '';
+      const payloadQuestion = query + (langSuffix && !query.includes('[') ? langSuffix : '');
+
       const payload: { question: string; api_key?: string; provider?: string } = {
-        question: query,
+        question: payloadQuestion,
       };
 
       if (apiKey.trim()) {

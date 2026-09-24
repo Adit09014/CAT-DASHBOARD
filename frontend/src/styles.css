@@ -1,4 +1,4 @@
-﻿@tailwind base;
+@tailwind base;
 @tailwind components;
 @tailwind utilities;
 
@@ -13,6 +13,8 @@
   --border-default: rgba(255, 255, 255, 0.10);
   --border-strong:  rgba(255, 255, 255, 0.18);
   --yellow:        #f5a623;
+  --cat-yellow:    #f5a623;
+  --accent-yellow: #f5a623;
   --yellow-dim:    rgba(245, 166, 35, 0.12);
   --yellow-border: rgba(245, 166, 35, 0.30);
   --green:         #22c55e;

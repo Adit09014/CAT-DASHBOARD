@@ -34,6 +34,7 @@ class Machine(Base):
     age_years: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     max_load_capacity_tons: Mapped[float] = mapped_column(Float, default=25.0, nullable=False)
     model_series: Mapped[str] = mapped_column(String(64), default="CAT 336", nullable=False)
+    machine_condition: Mapped[str] = mapped_column(String(32), default="Good", nullable=False)
     status: Mapped[str] = mapped_column(String(32), default="active", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
 
@@ -42,14 +43,27 @@ class Task(Base):
     __tablename__ = "tasks"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    task_code: Mapped[str] = mapped_column(String(32), default="T1001", nullable=False)
     task_type: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
-    weather_condition: Mapped[str] = mapped_column(String(64), default="Clear", nullable=False)
+    task_area_sqm: Mapped[float] = mapped_column(Float, default=200.0, nullable=False)
+    material_type: Mapped[str] = mapped_column(String(64), default="Soil", nullable=False)
+    ground_condition: Mapped[str] = mapped_column(String(64), default="Normal", nullable=False)
+    ground_slope_deg: Mapped[float] = mapped_column(Float, default=4.0, nullable=False)
+    site_distance_km: Mapped[float] = mapped_column(Float, default=2.5, nullable=False)
+    weather_condition: Mapped[str] = mapped_column(String(64), default="Sunny", nullable=False)
+    temperature_c: Mapped[float] = mapped_column(Float, default=24.0, nullable=False)
+    crew_size: Mapped[int] = mapped_column(Integer, default=3, nullable=False)
     required_skill: Mapped[str] = mapped_column(String(64), nullable=False)
+    operator_skill: Mapped[str] = mapped_column(String(32), default="Intermediate", nullable=False)
+    machine_condition: Mapped[str] = mapped_column(String(32), default="Good", nullable=False)
+    permit_setup_delay_min: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    breakdown_occurred: Mapped[str] = mapped_column(String(16), default="No", nullable=False)
     scheduled_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
     status: Mapped[str] = mapped_column(String(32), default="scheduled", nullable=False)
     estimated_duration: Mapped[int] = mapped_column(Integer, default=60, nullable=False)
     actual_duration: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    predicted_time_min: Mapped[float | None] = mapped_column(Float, nullable=True)
 
 
 class TaskAssignment(Base):
